@@ -45,7 +45,7 @@ def extract_text_from_pdf(file):
             text += page.extract_text()
     return text
 
-# Skills list (important 🔥)
+# Skills list
 skills_list = [
     "python","java","c++","sql","machine learning","deep learning",
     "data analysis","pandas","numpy","tensorflow","keras",
@@ -53,14 +53,19 @@ skills_list = [
     "aws","docker","git","linux"
 ]
 
+def detect_skills(text):
+    found = []
+    for skill in skills_list:
+        if re.search(r'\b' + re.escape(skill) + r'\b', text):
+            found.append(skill)
+    return found
+
 # =========================
 # MAIN BUTTON
 # =========================
 if st.button("🚀 Analyze"):
 
-    # =========================
     # GET CV
-    # =========================
     if uploaded_file:
         cv = extract_text_from_pdf(uploaded_file)
     else:
@@ -70,9 +75,7 @@ if st.button("🚀 Analyze"):
         st.warning("⚠️ Please upload or paste your CV")
         st.stop()
 
-    # =========================
-    # CLEAN + VECTORIZE
-    # =========================
+    # CLEAN
     cv_clean = clean_text(cv)
     cv_vec = vectorizer.transform([cv_clean])
 
@@ -123,7 +126,7 @@ if st.button("🚀 Analyze"):
         st.plotly_chart(fig_pie)
 
     # =========================
-    # MATCHING SYSTEM
+    # MATCHING
     # =========================
     if job_desc:
 
@@ -132,20 +135,15 @@ if st.button("🚀 Analyze"):
 
         similarity = cosine_similarity(cv_vec, job_vec)[0][0]
 
-        # =========================
-        # SKILLS DETECTION
-        # =========================
-        matched_skills = [
-            skill for skill in skills_list
-            if skill in cv_clean and skill in job_clean
-        ]
+        # Skills
+        cv_skills = detect_skills(cv_clean)
+        job_skills = detect_skills(job_clean)
+        matched_skills = list(set(cv_skills) & set(job_skills))
 
-        cv_skills = [skill for skill in skills_list if skill in cv_clean]
-        job_skills = [skill for skill in skills_list if skill in job_clean]
-
-        # Boost score
-        similarity += len(matched_skills) * 0.03
-        similarity = min(similarity, 1)
+        # Improved score
+        if job_skills:
+            skill_ratio = len(matched_skills) / len(job_skills)
+            similarity = 0.7 * similarity + 0.3 * skill_ratio
 
         score = similarity * 100
 
@@ -157,12 +155,11 @@ if st.button("🚀 Analyze"):
 
         col1, col2 = st.columns(2)
 
-        # ===== LEFT SIDE =====
+        # LEFT
         with col1:
             st.metric("Match Score", f"{score:.2f}%")
             st.progress(int(score))
 
-            # Gauge
             fig_gauge = go.Figure(go.Indicator(
                 mode="gauge+number",
                 value=score,
@@ -178,7 +175,6 @@ if st.button("🚀 Analyze"):
             ))
             st.plotly_chart(fig_gauge)
 
-            # Status
             if score > 75:
                 st.success("🔥 Strong Match")
             elif score > 50:
@@ -193,7 +189,7 @@ if st.button("🚀 Analyze"):
 - CV Words: {len(cv_clean.split())}
 """)
 
-        # ===== RIGHT SIDE =====
+        # RIGHT
         with col2:
             stop_words = ["the","a","to","in","of","and","with","for","on"]
 
@@ -206,7 +202,7 @@ if st.button("🚀 Analyze"):
             st.write(keywords[:15])
 
         # =========================
-        # SKILLS SECTION
+        # SKILLS ANALYSIS
         # =========================
         st.subheader("🧠 Skills Analysis")
 
@@ -220,7 +216,7 @@ if st.button("🚀 Analyze"):
             st.write("🧾 Job Skills")
             st.info(job_skills if job_skills else "No skills detected")
 
-        # Matched Skills
+        # MATCHED
         st.subheader("🎯 Matched Skills")
 
         if matched_skills:
@@ -237,15 +233,23 @@ if st.button("🚀 Analyze"):
             st.warning("No strong skill match")
 
         # =========================
+        # COVERAGE
+        # =========================
+        if job_skills:
+            coverage = (len(matched_skills) / len(job_skills)) * 100
+            st.subheader("📊 Skills Coverage")
+            st.progress(int(coverage))
+            st.write(f"{coverage:.1f}% of job skills covered")
+
+        # =========================
         # SUGGESTIONS
         # =========================
+        missing_skills = list(set(job_skills) - set(cv_skills))
+
         st.subheader("💡 Suggestions")
 
-        missing_skills = [s for s in job_skills if s not in cv_skills]
-
-        if score < 50:
-            st.write("👉 Add these skills:", missing_skills[:5])
-        elif score < 75:
-            st.write("👉 Improve wording + add:", missing_skills[:3])
+        if missing_skills:
+            st.warning("👉 Add these skills:")
+            st.write(missing_skills[:5])
         else:
-            st.write("🎉 Excellent match!")
+            st.success("🎉 Your CV matches the job very well!")
