@@ -2,6 +2,7 @@ streamlit
 scikit-learn
 pandas
 numpy
+PyPDF2
+spacy
 plotly
 altair
-PyPDF2
