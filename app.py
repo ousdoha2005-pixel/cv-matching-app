@@ -4,6 +4,9 @@ from sklearn.metrics.pairwise import cosine_similarity
 import PyPDF2
 import pandas as pd
 import altair as alt
+import plotly.express as px
+import plotly.graph_objects as go
+import re
 
 # =========================
 # LOAD FILES
@@ -31,7 +34,9 @@ job_desc = st.text_area("🧾 Paste Job Description (optional)")
 # FUNCTIONS
 # =========================
 def clean_text(text):
-    return text.lower().strip()
+    text = text.lower()
+    text = re.sub(r"[^\w\s]", "", text)
+    return text.strip()
 
 def extract_text_from_pdf(file):
     reader = PyPDF2.PdfReader(file)
@@ -46,7 +51,6 @@ def extract_text_from_pdf(file):
 # =========================
 if st.button("🚀 Analyze"):
 
-    # CV SOURCE
     if uploaded_file:
         cv = extract_text_from_pdf(uploaded_file)
     else:
@@ -57,12 +61,13 @@ if st.button("🚀 Analyze"):
         cv_clean = clean_text(cv)
         cv_vec = vectorizer.transform([cv_clean])
 
+        st.info(f"📄 CV Length: {len(cv_clean.split())} words")
+
         # =========================
         # 🎯 PREDICTION
         # =========================
         pred = model.predict(cv_vec)
         job = le.inverse_transform(pred)
-
         st.success(f"✅ Predicted job: **{job[0]}**")
 
         # =========================
@@ -71,33 +76,35 @@ if st.button("🚀 Analyze"):
         probs = model.predict_proba(cv_vec)[0]
         top_indices = probs.argsort()[-5:][::-1]
 
-        st.subheader("🏆 Top Matching Jobs")
-
         jobs = [le.classes_[i] for i in top_indices]
         scores = [probs[i]*100 for i in top_indices]
 
         df = pd.DataFrame({"Job": jobs, "Score": scores})
 
+        st.subheader("🏆 Top Matching Jobs")
+
+        # BAR (altair)
         chart = alt.Chart(df).mark_bar().encode(
             x=alt.X("Score", title="Probability (%)"),
             y=alt.Y("Job", sort='-x'),
             color="Job"
         )
-
         st.altair_chart(chart, use_container_width=True)
 
+        # 🔥 PIE CHART
+        fig_pie = px.pie(df, names="Job", values="Score", title="Job Distribution")
+        st.plotly_chart(fig_pie, use_container_width=True)
+
         # =========================
-        # 🔥 IF JOB DESCRIPTION EXISTS
+        # 🔥 MATCHING (IF JD EXISTS)
         # =========================
         if job_desc:
 
             job_clean = clean_text(job_desc)
             job_vec = vectorizer.transform([job_clean])
 
-            # similarity
             similarity = cosine_similarity(cv_vec, job_vec)[0][0]
 
-            # skills boost
             skills = ["python", "java", "sql", "machine learning", "django", "flask", "aws", "docker"]
 
             matched_skills = []
@@ -109,18 +116,30 @@ if st.button("🚀 Analyze"):
             similarity = min(similarity, 1)
             score = similarity * 100
 
-            # =========================
-            # 📊 DASHBOARD
-            # =========================
             st.divider()
             st.header("📊 Matching Dashboard")
 
             col1, col2 = st.columns(2)
 
-            # 🔹 SCORE
+            # 🔹 SCORE + GAUGE
             with col1:
                 st.metric("Match Score", f"{score:.2f}%")
                 st.progress(int(score))
+
+                fig_gauge = go.Figure(go.Indicator(
+                    mode="gauge+number",
+                    value=score,
+                    title={'text': "Match Score"},
+                    gauge={
+                        'axis': {'range': [0, 100]},
+                        'steps': [
+                            {'range': [0, 40], 'color': "red"},
+                            {'range': [40, 70], 'color': "orange"},
+                            {'range': [70, 100], 'color': "green"},
+                        ]
+                    }
+                ))
+                st.plotly_chart(fig_gauge)
 
                 if score > 70:
                     st.success("🔥 Strong Match")
@@ -129,10 +148,16 @@ if st.button("🚀 Analyze"):
                 else:
                     st.error("❌ Weak Match")
 
-            # 🔹 COMMON KEYWORDS
+            # 🔹 CLEAN KEYWORDS
             with col2:
-                common_words = list(set(cv_clean.split()) & set(job_clean.split()))
-                st.write("🔑 Common Keywords")
+                stop_words = ["the", "a", "to", "in", "of", "and", "with", "for"]
+
+                common_words = [
+                    w for w in set(cv_clean.split()) & set(job_clean.split())
+                    if w not in stop_words and len(w) > 2
+                ]
+
+                st.write("🔑 Clean Keywords")
                 st.write(common_words[:15])
 
             # =========================
@@ -148,16 +173,17 @@ if st.button("🚀 Analyze"):
                     "Value": [1]*len(matched_skills)
                 })
 
-                skill_chart = alt.Chart(skill_df).mark_bar().encode(
-                    x="Skill",
-                    y="Value",
-                    color="Skill"
-                )
-
-                st.altair_chart(skill_chart, use_container_width=True)
+                # 🔥 PIE SKILLS
+                fig_skill = px.pie(skill_df, names="Skill", values="Value", title="Matched Skills")
+                st.plotly_chart(fig_skill, use_container_width=True)
 
             else:
                 st.warning("No strong skill match")
+
+            # =========================
+            # 💡 EXPLANATION
+            # =========================
+            st.info("💡 Matching is calculated using NLP cosine similarity + skill matching.")
 
             # =========================
             # 💡 SUGGESTIONS
