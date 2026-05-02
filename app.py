@@ -2,114 +2,174 @@ import streamlit as st
 import pickle
 from sklearn.metrics.pairwise import cosine_similarity
 import PyPDF2
+import pandas as pd
+import altair as alt
 
-# load files
+# =========================
+# LOAD FILES
+# =========================
 model = pickle.load(open("model.pkl", "rb"))
 vectorizer = pickle.load(open("vectorizer.pkl", "rb"))
 le = pickle.load(open("label_encoder.pkl", "rb"))
 
-# UI
-st.set_page_config(page_title="CV Matcher PRO", page_icon="🚀")
+# =========================
+# UI CONFIG
+# =========================
+st.set_page_config(page_title="CV Matcher PRO", page_icon="🚀", layout="centered")
+
 st.title("🚀 CV Matching App PRO")
+st.markdown("### 🔍 Smart CV Analysis & Job Matching")
 
-# upload CV
+# =========================
+# INPUTS
+# =========================
 uploaded_file = st.file_uploader("📄 Upload your CV (PDF)", type=["pdf"])
-
-# text input fallback
 cv_text_input = st.text_area("✍️ Or paste your CV")
+job_desc = st.text_area("🧾 Paste Job Description (optional)")
 
-job_desc = st.text_area("🧾 Paste Job Description")
-
-# clean
+# =========================
+# FUNCTIONS
+# =========================
 def clean_text(text):
     return text.lower().strip()
 
-# extract PDF
 def extract_text_from_pdf(file):
     reader = PyPDF2.PdfReader(file)
     text = ""
     for page in reader.pages:
-        text += page.extract_text()
+        if page.extract_text():
+            text += page.extract_text()
     return text
 
-# button
+# =========================
+# BUTTON
+# =========================
 if st.button("🚀 Analyze"):
-    
+
+    # CV SOURCE
     if uploaded_file:
         cv = extract_text_from_pdf(uploaded_file)
     else:
         cv = cv_text_input
 
-    if cv and job_desc:
+    if cv:
 
         cv_clean = clean_text(cv)
-        job_clean = clean_text(job_desc)
-
         cv_vec = vectorizer.transform([cv_clean])
-        job_vec = vectorizer.transform([job_clean])
 
-        # prediction
+        # =========================
+        # 🎯 PREDICTION
+        # =========================
         pred = model.predict(cv_vec)
         job = le.inverse_transform(pred)
 
-        # similarity
-        similarity = cosine_similarity(cv_vec, job_vec)[0][0]
+        st.success(f"✅ Predicted job: **{job[0]}**")
 
-        # skills boost
-        skills = ["python", "java", "sql", "machine learning", "django", "flask", "aws", "docker"]
-
-        matched_skills = []
-        for skill in skills:
-            if skill in cv_clean and skill in job_clean:
-                similarity += 0.1
-                matched_skills.append(skill)
-
-        similarity = min(similarity, 1)
-        score = similarity * 100
-
-        # common words
-        common_words = list(set(cv_clean.split()) & set(job_clean.split()))
-
-        # 🔥 TOP JOBS RANKING
+        # =========================
+        # 🏆 TOP JOBS
+        # =========================
         probs = model.predict_proba(cv_vec)[0]
-        top_indices = probs.argsort()[-3:][::-1]
-        top_jobs = [(le.classes_[i], probs[i]) for i in top_indices]
+        top_indices = probs.argsort()[-5:][::-1]
 
-        # UI
-        st.success(f"✅ Predicted job: {job[0]}")
-
-        st.subheader("📊 Matching Score")
-        st.progress(int(score))
-
-        if score > 70:
-            st.success(f"🔥 Strong Match: {score:.2f}%")
-        elif score > 40:
-            st.warning(f"⚠️ Medium Match: {score:.2f}%")
-        else:
-            st.error(f"❌ Weak Match: {score:.2f}%")
-
-        st.subheader("🔑 Common Keywords")
-        st.write(common_words)
-
-        st.subheader("🧠 Matched Skills")
-        if matched_skills:
-            st.success(matched_skills)
-        else:
-            st.warning("No strong skill match")
-
-        # 🔥 TOP JOBS
         st.subheader("🏆 Top Matching Jobs")
-        for job_name, prob in top_jobs:
-            st.write(f"{job_name} → {prob*100:.2f}%")
 
-        # suggestions
-        st.subheader("💡 Suggestions")
-        if score < 50:
-            st.write("👉 Add more relevant skills from job description.")
-        elif score < 70:
-            st.write("👉 Improve your CV with more technologies.")
-        else:
-            st.write("🎉 Excellent match!")
+        jobs = [le.classes_[i] for i in top_indices]
+        scores = [probs[i]*100 for i in top_indices]
+
+        df = pd.DataFrame({"Job": jobs, "Score": scores})
+
+        chart = alt.Chart(df).mark_bar().encode(
+            x=alt.X("Score", title="Probability (%)"),
+            y=alt.Y("Job", sort='-x'),
+            color="Job"
+        )
+
+        st.altair_chart(chart, use_container_width=True)
+
+        # =========================
+        # 🔥 IF JOB DESCRIPTION EXISTS
+        # =========================
+        if job_desc:
+
+            job_clean = clean_text(job_desc)
+            job_vec = vectorizer.transform([job_clean])
+
+            # similarity
+            similarity = cosine_similarity(cv_vec, job_vec)[0][0]
+
+            # skills boost
+            skills = ["python", "java", "sql", "machine learning", "django", "flask", "aws", "docker"]
+
+            matched_skills = []
+            for skill in skills:
+                if skill in cv_clean and skill in job_clean:
+                    similarity += 0.1
+                    matched_skills.append(skill)
+
+            similarity = min(similarity, 1)
+            score = similarity * 100
+
+            # =========================
+            # 📊 DASHBOARD
+            # =========================
+            st.divider()
+            st.header("📊 Matching Dashboard")
+
+            col1, col2 = st.columns(2)
+
+            # 🔹 SCORE
+            with col1:
+                st.metric("Match Score", f"{score:.2f}%")
+                st.progress(int(score))
+
+                if score > 70:
+                    st.success("🔥 Strong Match")
+                elif score > 40:
+                    st.warning("⚠️ Medium Match")
+                else:
+                    st.error("❌ Weak Match")
+
+            # 🔹 COMMON KEYWORDS
+            with col2:
+                common_words = list(set(cv_clean.split()) & set(job_clean.split()))
+                st.write("🔑 Common Keywords")
+                st.write(common_words[:15])
+
+            # =========================
+            # 🧠 SKILLS
+            # =========================
+            st.subheader("🧠 Matched Skills")
+
+            if matched_skills:
+                st.success(matched_skills)
+
+                skill_df = pd.DataFrame({
+                    "Skill": matched_skills,
+                    "Value": [1]*len(matched_skills)
+                })
+
+                skill_chart = alt.Chart(skill_df).mark_bar().encode(
+                    x="Skill",
+                    y="Value",
+                    color="Skill"
+                )
+
+                st.altair_chart(skill_chart, use_container_width=True)
+
+            else:
+                st.warning("No strong skill match")
+
+            # =========================
+            # 💡 SUGGESTIONS
+            # =========================
+            st.subheader("💡 Suggestions")
+
+            if score < 50:
+                st.write("👉 Add more relevant skills from the job description.")
+            elif score < 70:
+                st.write("👉 Improve your CV by adding more technologies.")
+            else:
+                st.write("🎉 Excellent match!")
 
     else:
-        st.warning("⚠️ Please provide CV and Job Description")
+        st.warning("⚠️ Please upload or paste your CV")
