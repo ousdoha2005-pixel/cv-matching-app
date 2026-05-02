@@ -110,8 +110,10 @@ if st.button("🚀 Analyze"):
             matched_skills = []
             for skill in skills:
                 if skill in cv_clean and skill in job_clean:
-                    similarity += 0.1
-                    matched_skills.append(skill)
+                     match_count += 1
+                     matched_skills.append(skill)
+            similarity += match_count * 0.08
+
 
             similarity = min(similarity, 1)
             score = similarity * 100
@@ -125,6 +127,15 @@ if st.button("🚀 Analyze"):
             with col1:
                 st.metric("Match Score", f"{score:.2f}%")
                 st.progress(int(score))
+                # 👇 هنا زيد Why this score
+                st.caption("Explanation of how the score is calculated")
+                st.info(f"""
+               🧠 **Why this score?**
+
+                - 🔹 Similarity (NLP): {round(similarity*100,2)}%
+                - 🔹 Matched Skills: {len(matched_skills)}
+                - 🔹 CV Length: {len(cv_clean.split())} words
+                """)
 
                 fig_gauge = go.Figure(go.Indicator(
                     mode="gauge+number",
@@ -150,7 +161,8 @@ if st.button("🚀 Analyze"):
 
             # 🔹 CLEAN KEYWORDS
             with col2:
-                stop_words = ["the", "a", "to", "in", "of", "and", "with", "for"]
+                stop_words = ["the","a","to","in","of","and","with","for","on","at","is","are",
+                              "this","that","be","as","an","by","from","or","it","we","you"]
 
                 common_words = [
                     w for w in set(cv_clean.split()) & set(job_clean.split())
