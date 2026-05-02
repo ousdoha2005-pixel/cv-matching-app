@@ -1,15 +1,20 @@
 import streamlit as st
 import pickle
+import re
+import spacy
+import pandas as pd
 from sklearn.metrics.pairwise import cosine_similarity
 import PyPDF2
-import pandas as pd
-import altair as alt
 import plotly.express as px
 import plotly.graph_objects as go
-import re
 
 # =========================
-# LOAD FILES
+# LOAD NLP MODEL
+# =========================
+nlp = spacy.load("en_core_web_sm")
+
+# =========================
+# LOAD MODEL FILES
 # =========================
 model = pickle.load(open("model.pkl", "rb"))
 vectorizer = pickle.load(open("vectorizer.pkl", "rb"))
@@ -22,20 +27,23 @@ except:
 # =========================
 # UI
 # =========================
-st.set_page_config(page_title="CV Matcher PRO", page_icon="🚀")
-st.title("🚀 CV Matching App PRO")
+st.set_page_config(page_title="CV NLP PRO", page_icon="🚀")
+st.title("🚀 CV Matching NLP PRO")
 
-uploaded_file = st.file_uploader("📄 Upload your CV (PDF)", type=["pdf"])
-cv_text_input = st.text_area("✍️ Or paste your CV")
-job_desc = st.text_area("🧾 Paste Job Description")
+uploaded_file = st.file_uploader("📄 Upload your CV", type=["pdf"])
+cv_text_input = st.text_area("✍️ Or paste CV")
+job_desc = st.text_area("🧾 Job Description")
 
 # =========================
-# FUNCTIONS
+# FUNCTIONS NLP
 # =========================
 def clean_text(text):
-    text = text.lower()
-    text = re.sub(r"[^\w\s]", " ", text)
-    return text.strip()
+    doc = nlp(text.lower())
+    tokens = [
+        token.lemma_ for token in doc
+        if not token.is_stop and not token.is_punct
+    ]
+    return " ".join(tokens)
 
 def extract_text_from_pdf(file):
     reader = PyPDF2.PdfReader(file)
@@ -45,44 +53,45 @@ def extract_text_from_pdf(file):
             text += page.extract_text()
     return text
 
-# Skills list
-skills_list = [
+# Skills (تحسين)
+skills_db = [
     "python","java","c++","sql","machine learning","deep learning",
-    "data analysis","pandas","numpy","tensorflow","keras",
-    "django","flask","html","css","javascript","react",
+    "data science","data analysis","nlp","computer vision",
+    "pandas","numpy","tensorflow","keras","pytorch",
+    "flask","django","react","javascript","html","css",
     "aws","docker","git","linux"
 ]
 
-def detect_skills(text):
+def extract_skills(text):
+    text = text.lower()
     found = []
-    for skill in skills_list:
-        if re.search(r'\b' + re.escape(skill) + r'\b', text):
+    for skill in skills_db:
+        if skill in text:
             found.append(skill)
-    return found
+    return list(set(found))
 
 # =========================
-# MAIN BUTTON
+# MAIN
 # =========================
 if st.button("🚀 Analyze"):
 
-    # GET CV
+    # CV
     if uploaded_file:
         cv = extract_text_from_pdf(uploaded_file)
     else:
         cv = cv_text_input
 
-    if not cv or len(cv.strip()) == 0:
-        st.warning("⚠️ Please upload or paste your CV")
+    if not cv:
+        st.warning("Add CV")
         st.stop()
 
-    # CLEAN
     cv_clean = clean_text(cv)
     cv_vec = vectorizer.transform([cv_clean])
 
     st.info(f"📄 CV Length: {len(cv_clean.split())} words")
 
     # =========================
-    # PREDICTION
+    # CLASSIFICATION
     # =========================
     pred = model.predict(cv_vec)
 
@@ -94,7 +103,7 @@ if st.button("🚀 Analyze"):
     else:
         job_name = str(pred[0])
 
-    st.success(f"✅ Predicted job: {job_name}")
+    st.success(f"🎯 Predicted Job: {job_name}")
 
     # =========================
     # TOP JOBS
@@ -102,31 +111,26 @@ if st.button("🚀 Analyze"):
     if hasattr(model, "predict_proba"):
 
         probs = model.predict_proba(cv_vec)[0]
-        top_indices = probs.argsort()[-5:][::-1]
+        top_idx = probs.argsort()[-5:][::-1]
 
         if le:
-            jobs = [le.classes_[i] for i in top_indices]
+            jobs = [le.classes_[i] for i in top_idx]
         else:
-            jobs = [str(i) for i in top_indices]
+            jobs = [str(i) for i in top_idx]
 
-        scores = [probs[i]*100 for i in top_indices]
+        scores = [probs[i]*100 for i in top_idx]
 
         df = pd.DataFrame({"Job": jobs, "Score": scores})
 
-        st.subheader("🏆 Top Matching Jobs")
+        st.subheader("🏆 Top Jobs")
 
-        chart = alt.Chart(df).mark_bar().encode(
-            x="Score",
-            y=alt.Y("Job", sort='-x'),
-            color="Job"
-        )
-        st.altair_chart(chart, use_container_width=True)
+        fig = px.bar(df, x="Score", y="Job", orientation="h")
+        st.plotly_chart(fig)
 
-        fig_pie = px.pie(df, names="Job", values="Score")
-        st.plotly_chart(fig_pie)
+        st.plotly_chart(px.pie(df, names="Job", values="Score"))
 
     # =========================
-    # MATCHING
+    # MATCHING NLP
     # =========================
     if job_desc:
 
@@ -136,14 +140,15 @@ if st.button("🚀 Analyze"):
         similarity = cosine_similarity(cv_vec, job_vec)[0][0]
 
         # Skills
-        cv_skills = detect_skills(cv_clean)
-        job_skills = detect_skills(job_clean)
-        matched_skills = list(set(cv_skills) & set(job_skills))
+        cv_skills = extract_skills(cv)
+        job_skills = extract_skills(job_desc)
 
-        # Improved score
+        matched = list(set(cv_skills) & set(job_skills))
+
+        # Boost score
         if job_skills:
-            skill_ratio = len(matched_skills) / len(job_skills)
-            similarity = 0.7 * similarity + 0.3 * skill_ratio
+            skill_score = len(matched) / len(job_skills)
+            similarity = 0.6 * similarity + 0.4 * skill_score
 
         score = similarity * 100
 
@@ -151,11 +156,10 @@ if st.button("🚀 Analyze"):
         # DASHBOARD
         # =========================
         st.divider()
-        st.header("📊 Matching Dashboard")
+        st.header("📊 Dashboard")
 
         col1, col2 = st.columns(2)
 
-        # LEFT
         with col1:
             st.metric("Match Score", f"{score:.2f}%")
             st.progress(int(score))
@@ -163,7 +167,7 @@ if st.button("🚀 Analyze"):
             fig_gauge = go.Figure(go.Indicator(
                 mode="gauge+number",
                 value=score,
-                title={'text': "Match Score"},
+                title={'text': "Score"},
                 gauge={
                     'axis': {'range': [0, 100]},
                     'steps': [
@@ -182,74 +186,39 @@ if st.button("🚀 Analyze"):
             else:
                 st.error("❌ Weak Match")
 
-            st.info(f"""
-🧠 Details:
-- Similarity: {round(similarity*100,2)}%
-- Matched Skills: {len(matched_skills)}
-- CV Words: {len(cv_clean.split())}
-""")
-
-        # RIGHT
         with col2:
-            stop_words = ["the","a","to","in","of","and","with","for","on"]
-
-            keywords = [
-                w for w in set(cv_clean.split()) & set(job_clean.split())
-                if w not in stop_words and len(w) > 2
-            ]
-
-            st.subheader("🔑 Keywords Match")
+            keywords = list(set(cv_clean.split()) & set(job_clean.split()))
+            st.subheader("🔑 Keywords")
             st.write(keywords[:15])
 
         # =========================
-        # SKILLS ANALYSIS
+        # SKILLS
         # =========================
         st.subheader("🧠 Skills Analysis")
 
-        col3, col4 = st.columns(2)
+        st.write("📄 CV Skills:", cv_skills)
+        st.write("🧾 Job Skills:", job_skills)
 
-        with col3:
-            st.write("📄 CV Skills")
-            st.success(cv_skills if cv_skills else "No skills detected")
-
-        with col4:
-            st.write("🧾 Job Skills")
-            st.info(job_skills if job_skills else "No skills detected")
-
-        # MATCHED
         st.subheader("🎯 Matched Skills")
-
-        if matched_skills:
-            st.success(matched_skills)
-
-            df_skills = pd.DataFrame({
-                "Skill": matched_skills,
-                "Value": [1]*len(matched_skills)
-            })
-
-            fig = px.pie(df_skills, names="Skill", values="Value")
-            st.plotly_chart(fig)
-        else:
-            st.warning("No strong skill match")
+        st.success(matched if matched else "No match")
 
         # =========================
         # COVERAGE
         # =========================
         if job_skills:
-            coverage = (len(matched_skills) / len(job_skills)) * 100
-            st.subheader("📊 Skills Coverage")
+            coverage = (len(matched) / len(job_skills)) * 100
             st.progress(int(coverage))
-            st.write(f"{coverage:.1f}% of job skills covered")
+            st.write(f"Coverage: {coverage:.1f}%")
 
         # =========================
         # SUGGESTIONS
         # =========================
-        missing_skills = list(set(job_skills) - set(cv_skills))
+        missing = list(set(job_skills) - set(cv_skills))
 
         st.subheader("💡 Suggestions")
 
-        if missing_skills:
-            st.warning("👉 Add these skills:")
-            st.write(missing_skills[:5])
+        if missing:
+            st.warning("Add these skills:")
+            st.write(missing[:5])
         else:
-            st.success("🎉 Your CV matches the job very well!")
+            st.success("Perfect match 🎉")
