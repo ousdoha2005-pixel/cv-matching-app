@@ -102,21 +102,20 @@ if st.button("🚀 Analyze"):
 
             job_clean = clean_text(job_desc)
             job_vec = vectorizer.transform([job_clean])
-
             similarity = cosine_similarity(cv_vec, job_vec)[0][0]
 
-            skills = ["python", "java", "sql", "machine learning", "django", "flask", "aws", "docker"]
-
+            match_count = 0
             matched_skills = []
+
             for skill in skills:
-                if skill in cv_clean and skill in job_clean:
-                     match_count += 1
-                     matched_skills.append(skill)
-            similarity += match_count * 0.08
+                 if skill in cv_clean and skill in job_clean:
+                       match_count += 1
+                       matched_skills.append(skill)
 
+                similarity += match_count * 0.08
+                similarity = min(similarity, 1)
+                score = similarity * 100
 
-            similarity = min(similarity, 1)
-            score = similarity * 100
 
             st.divider()
             st.header("📊 Matching Dashboard")
