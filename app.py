@@ -13,7 +13,11 @@ import re
 # =========================
 model = pickle.load(open("model.pkl", "rb"))
 vectorizer = pickle.load(open("vectorizer.pkl", "rb"))
-le = pickle.load(open("label_encoder.pkl", "rb"))
+
+try:
+    le = pickle.load(open("label_encoder.pkl", "rb"))
+except:
+    le = None
 
 # =========================
 # UI
@@ -31,7 +35,7 @@ job_desc = st.text_area("🧾 Paste Job Description (optional)")
 # =========================
 def clean_text(text):
     text = text.lower()
-    text = re.sub(r"[^\w\s]", "", text)
+    text = re.sub(r"[^\w\s]", " ", text)
     return text.strip()
 
 def extract_text_from_pdf(file):
@@ -53,27 +57,44 @@ if st.button("🚀 Analyze"):
     else:
         cv = cv_text_input
 
-    if cv:
+    if not cv or len(cv.strip()) == 0:
+        st.warning("⚠️ Please upload or paste your CV")
+        st.stop()
 
-        cv_clean = clean_text(cv)
-        cv_vec = vectorizer.transform([cv_clean])
+    # =========================
+    # CLEAN + VECTORIZE
+    # =========================
+    cv_clean = clean_text(cv)
+    cv_vec = vectorizer.transform([cv_clean])
 
-        st.info(f"📄 CV Length: {len(cv_clean.split())} words")
+    st.info(f"📄 CV Length: {len(cv_clean.split())} words")
 
-        # =========================
-        # PREDICTION
-        # =========================
-        pred = model.predict(cv_vec)
+    # =========================
+    # PREDICTION
+    # =========================
+    pred = model.predict(cv_vec)
+
+    if le:
         job = le.inverse_transform(pred)
-        st.success(f"✅ Predicted job: {job[0]}")
+        job_name = job[0]
+    else:
+        job_name = str(pred[0])
 
-        # =========================
-        # TOP JOBS
-        # =========================
+    st.success(f"✅ Predicted job: {job_name}")
+
+    # =========================
+    # TOP JOBS
+    # =========================
+    if hasattr(model, "predict_proba"):
+
         probs = model.predict_proba(cv_vec)[0]
         top_indices = probs.argsort()[-5:][::-1]
 
-        jobs = [le.classes_[i] for i in top_indices]
+        if le:
+            jobs = [le.classes_[i] for i in top_indices]
+        else:
+            jobs = [str(i) for i in top_indices]
+
         scores = [probs[i]*100 for i in top_indices]
 
         df = pd.DataFrame({"Job": jobs, "Score": scores})
@@ -90,43 +111,43 @@ if st.button("🚀 Analyze"):
         fig_pie = px.pie(df, names="Job", values="Score", title="Job Distribution")
         st.plotly_chart(fig_pie)
 
+    # =========================
+    # MATCHING
+    # =========================
+    if job_desc:
+
+        job_clean = clean_text(job_desc)
+        job_vec = vectorizer.transform([job_clean])
+
+        similarity = cosine_similarity(cv_vec, job_vec)[0][0]
+
+        skills = ["python","java","sql","machine learning","django","flask","aws","docker"]
+
+        match_count = 0
+        matched_skills = []
+
+        for skill in skills:
+            if skill in cv_clean and skill in job_clean:
+                match_count += 1
+                matched_skills.append(skill)
+
+        similarity += match_count * 0.05
+        similarity = min(similarity, 1)
+        score = similarity * 100
+
         # =========================
-        # MATCHING (ONLY IF JD EXISTS)
+        # DASHBOARD
         # =========================
-        if job_desc:
+        st.divider()
+        st.header("📊 Matching Dashboard")
 
-            job_clean = clean_text(job_desc)
-            job_vec = vectorizer.transform([job_clean])
+        col1, col2 = st.columns(2)
 
-            similarity = cosine_similarity(cv_vec, job_vec)[0][0]
+        with col1:
+            st.metric("Match Score", f"{score:.2f}%")
+            st.progress(int(score))
 
-            skills = ["python","java","sql","machine learning","django","flask","aws","docker"]
-
-            match_count = 0
-            matched_skills = []
-
-            for skill in skills:
-                if skill in cv_clean and skill in job_clean:
-                    match_count += 1
-                    matched_skills.append(skill)
-
-            similarity += match_count * 0.05
-            similarity = min(similarity, 1)
-            score = similarity * 100
-
-            # =========================
-            # DASHBOARD
-            # =========================
-            st.divider()
-            st.header("📊 Matching Dashboard")
-
-            col1, col2 = st.columns(2)
-
-            with col1:
-                st.metric("Match Score", f"{score:.2f}%")
-                st.progress(int(score))
-
-                st.info(f"""
+            st.info(f"""
 🧠 Why this score?
 
 - Similarity: {round(similarity*100,2)}%
@@ -134,69 +155,66 @@ if st.button("🚀 Analyze"):
 - CV Length: {len(cv_clean.split())}
 """)
 
-                fig_gauge = go.Figure(go.Indicator(
-                    mode="gauge+number",
-                    value=score,
-                    title={'text': "Match Score"},
-                    gauge={
-                        'axis': {'range': [0, 100]},
-                        'steps': [
-                            {'range': [0, 40], 'color': "red"},
-                            {'range': [40, 70], 'color': "orange"},
-                            {'range': [70, 100], 'color': "green"},
-                        ]
-                    }
-                ))
-                st.plotly_chart(fig_gauge)
+            fig_gauge = go.Figure(go.Indicator(
+                mode="gauge+number",
+                value=score,
+                title={'text': "Match Score"},
+                gauge={
+                    'axis': {'range': [0, 100]},
+                    'steps': [
+                        {'range': [0, 40], 'color': "red"},
+                        {'range': [40, 70], 'color': "orange"},
+                        {'range': [70, 100], 'color': "green"},
+                    ]
+                }
+            ))
+            st.plotly_chart(fig_gauge)
 
-                if score > 70:
-                    st.success("🔥 Strong Match")
-                elif score > 40:
-                    st.warning("⚠️ Medium Match")
-                else:
-                    st.error("❌ Weak Match")
-
-            with col2:
-                stop_words = ["the","a","to","in","of","and","with","for","on"]
-
-                common_words = [
-                    w for w in set(cv_clean.split()) & set(job_clean.split())
-                    if w not in stop_words and len(w) > 2
-                ]
-
-                st.write("🔑 Keywords")
-                st.write(common_words[:15])
-
-            # =========================
-            # SKILLS
-            # =========================
-            st.subheader("🧠 Matched Skills")
-
-            if matched_skills:
-                st.success(matched_skills)
-
-                skill_df = pd.DataFrame({
-                    "Skill": matched_skills,
-                    "Value": [1]*len(matched_skills)
-                })
-
-                fig_skill = px.pie(skill_df, names="Skill", values="Value")
-                st.plotly_chart(fig_skill)
-
+            if score > 70:
+                st.success("🔥 Strong Match")
+            elif score > 40:
+                st.warning("⚠️ Medium Match")
             else:
-                st.warning("No strong skill match")
+                st.error("❌ Weak Match")
 
-            # =========================
-            # SUGGESTIONS
-            # =========================
-            st.subheader("💡 Suggestions")
+        with col2:
+            stop_words = ["the","a","to","in","of","and","with","for","on"]
 
-            if score < 50:
-                st.write("👉 Add more skills from job description")
-            elif score < 70:
-                st.write("👉 Improve your CV")
-            else:
-                st.write("🎉 Excellent match!")
+            common_words = [
+                w for w in set(cv_clean.split()) & set(job_clean.split())
+                if w not in stop_words and len(w) > 2
+            ]
 
-    else:
-        st.warning("⚠️ Please upload or paste your CV")
+            st.write("🔑 Keywords")
+            st.write(common_words[:15])
+
+        # =========================
+        # SKILLS
+        # =========================
+        st.subheader("🧠 Matched Skills")
+
+        if matched_skills:
+            st.success(matched_skills)
+
+            skill_df = pd.DataFrame({
+                "Skill": matched_skills,
+                "Value": [1]*len(matched_skills)
+            })
+
+            fig_skill = px.pie(skill_df, names="Skill", values="Value")
+            st.plotly_chart(fig_skill)
+
+        else:
+            st.warning("No strong skill match")
+
+        # =========================
+        # SUGGESTIONS
+        # =========================
+        st.subheader("💡 Suggestions")
+
+        if score < 50:
+            st.write("👉 Add more skills from job description")
+        elif score < 70:
+            st.write("👉 Improve your CV")
+        else:
+            st.write("🎉 Excellent match!")
