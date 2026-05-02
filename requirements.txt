@@ -1,4 +1,5 @@
 streamlit
 scikit-learn
-numpy
+pandas
+altair
 PyPDF2
