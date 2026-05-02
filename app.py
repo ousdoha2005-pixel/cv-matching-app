@@ -14,13 +14,21 @@ st.title("CV Matching App")
 cv = st.text_area("Paste your CV")
 job_desc = st.text_area("Paste Job Description")
 
+# clean function
+def clean_text(text):
+    return text.lower().strip()
+
 # button
 if st.button("Analyze"):
     if cv and job_desc:
         
+        # cleaning
+        cv_clean = clean_text(cv)
+        job_clean = clean_text(job_desc)
+        
         # transform
-        cv_vec = vectorizer.transform([cv])
-        job_vec = vectorizer.transform([job_desc])
+        cv_vec = vectorizer.transform([cv_clean])
+        job_vec = vectorizer.transform([job_clean])
         
         # prediction
         pred = model.predict(cv_vec)
@@ -28,12 +36,19 @@ if st.button("Analyze"):
         
         # similarity
         similarity = cosine_similarity(cv_vec, job_vec)[0][0]
+        
+        # boost
+        if "python" in cv_clean and "python" in job_clean:
+            similarity += 0.2
+        if "developer" in cv_clean and "developer" in job_clean:
+            similarity += 0.2
+        
+        similarity = min(similarity, 1)
         score = similarity * 100
         
-        # show result
+        # results
         st.success(f"Predicted job: {job[0]}")
         
-        # matching score display
         if score > 70:
             st.success(f"🔥 Strong Match: {score:.2f}%")
         elif score > 40:
