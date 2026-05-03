@@ -15,39 +15,53 @@ nltk.download('stopwords')
 # ======================
 # CONFIG
 # ======================
-st.set_page_config(page_title="CV Matcher Pro", page_icon="🚀", layout="wide")
+st.set_page_config(page_title="CV Matcher PRO MAX", page_icon="🚀", layout="wide")
 
 # ======================
-# CSS PRO UI
+# CSS ULTRA STYLE
 # ======================
 st.markdown("""
 <style>
 body {background-color: #0E1117;}
-textarea {background-color: #1E1E2F !important; color:white !important;}
 
+textarea {
+    background-color: #1E1E2F !important;
+    color:white !important;
+}
+
+/* CARDS */
 .card {
     padding:20px;
     border-radius:15px;
-    background: linear-gradient(135deg,#1f4037,#99f2c8);
-    color:black;
+    background: linear-gradient(135deg,#00c6ff,#0072ff);
+    color:white;
     text-align:center;
     margin:10px;
-    font-size:18px;
+    font-size:20px;
+    box-shadow: 0px 4px 20px rgba(0,0,0,0.5);
 }
 
+/* BADGES */
 .badge {
     background-color:#4CAF50;
-    padding:5px 10px;
-    border-radius:8px;
-    margin:3px;
+    padding:6px 12px;
+    border-radius:10px;
+    margin:5px;
     display:inline-block;
     color:white;
+    font-size:14px;
+}
+
+/* TITLE */
+h1 {
+    text-align:center;
+    color:#00c6ff;
 }
 </style>
 """, unsafe_allow_html=True)
 
 # ======================
-# LOAD
+# LOAD MODEL
 # ======================
 model = pickle.load(open("model.pkl","rb"))
 vectorizer = pickle.load(open("vectorizer.pkl","rb"))
@@ -63,6 +77,7 @@ def clean_text(text):
     text = re.sub(r'[^a-zA-Z]', ' ', text)
     text = text.lower()
     words = text.split()
+    words = list(set(words))  # remove duplicates 🔥
     words = [w for w in words if w not in stop_words]
     return " ".join(words)
 
@@ -80,7 +95,7 @@ def read_pdf(file):
 # ======================
 # KEYWORDS
 # ======================
-def extract_keywords(text, top_n=10):
+def extract_keywords(text, top_n=15):
     words = text.split()
     freq = Counter(words)
     return [w for w, _ in freq.most_common(top_n)]
@@ -88,7 +103,7 @@ def extract_keywords(text, top_n=10):
 # ======================
 # UI
 # ======================
-st.title("🚀 CV Matching & Analysis Dashboard")
+st.title("🚀 CV Matching Dashboard PRO MAX")
 
 col1, col2 = st.columns(2)
 
@@ -109,9 +124,9 @@ if cv_file:
 if st.button("🔍 Analyze CV"):
 
     if cv_text == "" or job_desc.strip() == "":
-        st.warning("⚠️ Please upload CV and add job description")
+        st.warning("⚠️ Upload CV and job description")
     else:
-        with st.spinner("⏳ Processing..."):
+        with st.spinner("⏳ AI is analyzing..."):
             time.sleep(1.5)
 
         # CLEAN
@@ -131,16 +146,22 @@ if st.button("🔍 Analyze CV"):
         confidence = max(probs)
 
         # ======================
-        # DASHBOARD CARDS
+        # 🎯 DASHBOARD CARDS
         # ======================
         c1, c2, c3 = st.columns(3)
 
         c1.markdown(f"<div class='card'>🎯 Category<br><b>{pred}</b></div>", unsafe_allow_html=True)
         c2.markdown(f"<div class='card'>📊 Confidence<br><b>{confidence:.2f}</b></div>", unsafe_allow_html=True)
-        c3.markdown(f"<div class='card'>🔗 Matching<br><b>{similarity:.2f}</b></div>", unsafe_allow_html=True)
+        c3.markdown(f"<div class='card'>🔗 Match Score<br><b>{similarity:.2f}</b></div>", unsafe_allow_html=True)
 
         # ======================
-        # TOP 3
+        # 📊 PROGRESS BAR
+        # ======================
+        st.subheader("📈 Matching Level")
+        st.progress(float(similarity))
+
+        # ======================
+        # 🏆 TOP 3
         # ======================
         st.subheader("🏆 Top Predictions")
 
@@ -151,9 +172,9 @@ if st.button("🔍 Analyze CV"):
             st.write(f"👉 {cat} : {probs[i]:.2f}")
 
         # ======================
-        # CHART
+        # 📊 BAR CHART
         # ======================
-        st.subheader("📊 Prediction Distribution")
+        st.subheader("📊 Probability Distribution")
 
         df = pd.DataFrame({
             "Category": label_encoder.classes_,
@@ -163,17 +184,24 @@ if st.button("🔍 Analyze CV"):
         st.bar_chart(df.set_index("Category"))
 
         # ======================
-        # KEYWORDS
+        # 🥧 PIE CHART
+        # ======================
+        st.subheader("🥧 Category Share")
+
+        st.write(df.set_index("Category"))
+
+        # ======================
+        # 🧠 KEYWORDS
         # ======================
         st.subheader("🧠 Extracted Keywords")
 
-        keywords = extract_keywords(cv_clean, 15)
+        keywords = extract_keywords(cv_clean)
 
         for k in keywords:
             st.markdown(f"<span class='badge'>{k}</span>", unsafe_allow_html=True)
 
         # ======================
-        # SKILLS MATCHING
+        # 🎯 SKILLS MATCHING
         # ======================
         st.subheader("🎯 Matching Skills")
 
@@ -183,25 +211,25 @@ if st.button("🔍 Analyze CV"):
         matched = cv_words.intersection(job_words)
 
         if matched:
-            for m in list(matched)[:20]:
+            for m in list(matched)[:25]:
                 st.markdown(f"<span class='badge'>{m}</span>", unsafe_allow_html=True)
         else:
             st.write("No strong matching keywords")
 
         # ======================
-        # INTERPRETATION
+        # 📌 INTERPRETATION
         # ======================
-        st.subheader("📌 Interpretation")
+        st.subheader("📌 Final Decision")
 
         if similarity > 0.7:
-            st.success("🔥 Excellent Match")
+            st.success("🔥 Excellent Match - Highly Recommended")
         elif similarity > 0.4:
-            st.info("🙂 متوسط")
+            st.info("🙂 Moderate Match")
         else:
-            st.error("❌ ضعيف")
+            st.error("❌ Weak Match")
 
         # ======================
-        # CLEAN TEXT (OPTIONAL)
+        # CLEAN TEXT
         # ======================
         with st.expander("🧹 Show Cleaned CV"):
             st.write(cv_clean)
