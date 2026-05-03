@@ -8,28 +8,40 @@ from nltk.corpus import stopwords
 from PyPDF2 import PdfReader
 from sklearn.metrics.pairwise import cosine_similarity
 import time
+from collections import Counter
 
 nltk.download('stopwords')
 
 # ======================
 # CONFIG
 # ======================
-st.set_page_config(page_title="CV Matcher", page_icon="📄", layout="centered")
+st.set_page_config(page_title="CV Matcher Pro", page_icon="🚀", layout="wide")
 
 # ======================
-# CSS
+# CSS PRO UI
 # ======================
 st.markdown("""
 <style>
 body {background-color: #0E1117;}
 textarea {background-color: #1E1E2F !important; color:white !important;}
-.result-box {
-    padding:15px;
-    border-radius:10px;
-    background: linear-gradient(90deg,#1f4037,#99f2c8);
+
+.card {
+    padding:20px;
+    border-radius:15px;
+    background: linear-gradient(135deg,#1f4037,#99f2c8);
     color:black;
     text-align:center;
+    margin:10px;
     font-size:18px;
+}
+
+.badge {
+    background-color:#4CAF50;
+    padding:5px 10px;
+    border-radius:8px;
+    margin:3px;
+    display:inline-block;
+    color:white;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -55,25 +67,36 @@ def clean_text(text):
     return " ".join(words)
 
 # ======================
-# PDF READER
+# PDF
 # ======================
 def read_pdf(file):
     pdf = PdfReader(file)
     text = ""
     for page in pdf.pages:
-        text += page.extract_text() + " "
+        if page.extract_text():
+            text += page.extract_text() + " "
     return text
+
+# ======================
+# KEYWORDS
+# ======================
+def extract_keywords(text, top_n=10):
+    words = text.split()
+    freq = Counter(words)
+    return [w for w, _ in freq.most_common(top_n)]
 
 # ======================
 # UI
 # ======================
-st.title("🚀 CV Matching & Classification App")
+st.title("🚀 CV Matching & Analysis Dashboard")
 
-# CV Upload
-cv_file = st.file_uploader("📄 Upload your CV (PDF)", type=["pdf"])
+col1, col2 = st.columns(2)
 
-# Job Description
-job_desc = st.text_area("💼 Paste Job Description here:", height=200)
+with col1:
+    cv_file = st.file_uploader("📄 Upload CV (PDF)", type=["pdf"])
+
+with col2:
+    job_desc = st.text_area("💼 Job Description", height=150)
 
 cv_text = ""
 
@@ -83,13 +106,12 @@ if cv_file:
 # ======================
 # BUTTON
 # ======================
-if st.button("🔍 Analyze"):
+if st.button("🔍 Analyze CV"):
 
     if cv_text == "" or job_desc.strip() == "":
         st.warning("⚠️ Please upload CV and add job description")
     else:
-        # Animation loading
-        with st.spinner("⏳ Analyzing..."):
+        with st.spinner("⏳ Processing..."):
             time.sleep(1.5)
 
         # CLEAN
@@ -100,33 +122,38 @@ if st.button("🔍 Analyze"):
         cv_vec = vectorizer.transform([cv_clean])
         job_vec = vectorizer.transform([job_clean])
 
-        # ======================
-        # 🔗 SIMILARITY
-        # ======================
+        # SIMILARITY
         similarity = cosine_similarity(cv_vec, job_vec)[0][0]
 
-        # ======================
-        # 🤖 PREDICTION
-        # ======================
+        # MODEL
         pred = model.predict(cv_vec)[0]
         probs = model.predict_proba(cv_vec)[0]
         confidence = max(probs)
 
         # ======================
-        # 🎯 RESULT
+        # DASHBOARD CARDS
         # ======================
-        st.markdown(f"""
-        <div class="result-box">
-        🎯 Category: <b>{pred}</b><br>
-        📊 Confidence: <b>{confidence:.2f}</b><br>
-        🔗 Matching Score: <b>{similarity:.2f}</b>
-        </div>
-        """, unsafe_allow_html=True)
+        c1, c2, c3 = st.columns(3)
+
+        c1.markdown(f"<div class='card'>🎯 Category<br><b>{pred}</b></div>", unsafe_allow_html=True)
+        c2.markdown(f"<div class='card'>📊 Confidence<br><b>{confidence:.2f}</b></div>", unsafe_allow_html=True)
+        c3.markdown(f"<div class='card'>🔗 Matching<br><b>{similarity:.2f}</b></div>", unsafe_allow_html=True)
 
         # ======================
-        # 📊 BAR CHART
+        # TOP 3
         # ======================
-        st.subheader("📊 Prediction Probabilities")
+        st.subheader("🏆 Top Predictions")
+
+        top3 = np.argsort(probs)[-3:][::-1]
+
+        for i in top3:
+            cat = label_encoder.inverse_transform([i])[0]
+            st.write(f"👉 {cat} : {probs[i]:.2f}")
+
+        # ======================
+        # CHART
+        # ======================
+        st.subheader("📊 Prediction Distribution")
 
         df = pd.DataFrame({
             "Category": label_encoder.classes_,
@@ -136,22 +163,45 @@ if st.button("🔍 Analyze"):
         st.bar_chart(df.set_index("Category"))
 
         # ======================
-        # 🏆 TOP 3
+        # KEYWORDS
         # ======================
-        st.subheader("🏆 Top Predictions")
+        st.subheader("🧠 Extracted Keywords")
 
-        top3 = np.argsort(probs)[-3:][::-1]
+        keywords = extract_keywords(cv_clean, 15)
 
-        for i in top3:
-            cat = label_encoder.inverse_transform([i])[0]
-            st.write(f"{cat} : {probs[i]:.2f}")
+        for k in keywords:
+            st.markdown(f"<span class='badge'>{k}</span>", unsafe_allow_html=True)
 
         # ======================
-        # 🧠 INTERPRETATION
+        # SKILLS MATCHING
         # ======================
+        st.subheader("🎯 Matching Skills")
+
+        cv_words = set(cv_clean.split())
+        job_words = set(job_clean.split())
+
+        matched = cv_words.intersection(job_words)
+
+        if matched:
+            for m in list(matched)[:20]:
+                st.markdown(f"<span class='badge'>{m}</span>", unsafe_allow_html=True)
+        else:
+            st.write("No strong matching keywords")
+
+        # ======================
+        # INTERPRETATION
+        # ======================
+        st.subheader("📌 Interpretation")
+
         if similarity > 0.7:
-            st.success("🔥 Great match!")
+            st.success("🔥 Excellent Match")
         elif similarity > 0.4:
             st.info("🙂 متوسط")
         else:
             st.error("❌ ضعيف")
+
+        # ======================
+        # CLEAN TEXT (OPTIONAL)
+        # ======================
+        with st.expander("🧹 Show Cleaned CV"):
+            st.write(cv_clean)
