@@ -1,17 +1,11 @@
 import streamlit as st
 import pickle
-import re
-import spacy
 import pandas as pd
+import re
 from sklearn.metrics.pairwise import cosine_similarity
 import PyPDF2
 import plotly.express as px
 import plotly.graph_objects as go
-
-# =========================
-# LOAD NLP MODEL
-# =========================
-nlp = spacy.load("en_core_web_sm")
 
 # =========================
 # LOAD MODEL FILES
@@ -25,25 +19,23 @@ except:
     le = None
 
 # =========================
-# UI
+# UI CONFIG
 # =========================
-st.set_page_config(page_title="CV NLP PRO", page_icon="🚀")
-st.title("🚀 CV Matching NLP PRO")
+st.set_page_config(page_title="CV Matching PRO", page_icon="🚀")
+st.title("🚀 CV Matching App PRO")
 
 uploaded_file = st.file_uploader("📄 Upload your CV", type=["pdf"])
-cv_text_input = st.text_area("✍️ Or paste CV")
-job_desc = st.text_area("🧾 Job Description")
+cv_text_input = st.text_area("✍️ Or paste your CV")
+job_desc = st.text_area("🧾 Paste Job Description")
 
 # =========================
-# FUNCTIONS NLP
+# FUNCTIONS
 # =========================
 def clean_text(text):
-    doc = nlp(text.lower())
-    tokens = [
-        token.lemma_ for token in doc
-        if not token.is_stop and not token.is_punct
-    ]
-    return " ".join(tokens)
+    text = str(text).lower()
+    text = re.sub(r'[^a-zA-Z ]', ' ', text)
+    text = re.sub(r'\s+', ' ', text)
+    return text
 
 def extract_text_from_pdf(file):
     reader = PyPDF2.PdfReader(file)
@@ -53,7 +45,7 @@ def extract_text_from_pdf(file):
             text += page.extract_text()
     return text
 
-# Skills (تحسين)
+# Skills DB
 skills_db = [
     "python","java","c++","sql","machine learning","deep learning",
     "data science","data analysis","nlp","computer vision",
@@ -64,25 +56,21 @@ skills_db = [
 
 def extract_skills(text):
     text = text.lower()
-    found = []
-    for skill in skills_db:
-        if skill in text:
-            found.append(skill)
-    return list(set(found))
+    return list(set([skill for skill in skills_db if skill in text]))
 
 # =========================
 # MAIN
 # =========================
 if st.button("🚀 Analyze"):
 
-    # CV
+    # CV INPUT
     if uploaded_file:
         cv = extract_text_from_pdf(uploaded_file)
     else:
         cv = cv_text_input
 
     if not cv:
-        st.warning("Add CV")
+        st.warning("⚠️ Please add your CV")
         st.stop()
 
     cv_clean = clean_text(cv)
@@ -122,7 +110,7 @@ if st.button("🚀 Analyze"):
 
         df = pd.DataFrame({"Job": jobs, "Score": scores})
 
-        st.subheader("🏆 Top Jobs")
+        st.subheader("🏆 Top Matching Jobs")
 
         fig = px.bar(df, x="Score", y="Job", orientation="h")
         st.plotly_chart(fig)
@@ -130,7 +118,7 @@ if st.button("🚀 Analyze"):
         st.plotly_chart(px.pie(df, names="Job", values="Score"))
 
     # =========================
-    # MATCHING NLP
+    # MATCHING
     # =========================
     if job_desc:
 
@@ -156,7 +144,7 @@ if st.button("🚀 Analyze"):
         # DASHBOARD
         # =========================
         st.divider()
-        st.header("📊 Dashboard")
+        st.header("📊 Matching Dashboard")
 
         col1, col2 = st.columns(2)
 
@@ -188,11 +176,11 @@ if st.button("🚀 Analyze"):
 
         with col2:
             keywords = list(set(cv_clean.split()) & set(job_clean.split()))
-            st.subheader("🔑 Keywords")
+            st.subheader("🔑 Keywords Match")
             st.write(keywords[:15])
 
         # =========================
-        # SKILLS
+        # SKILLS ANALYSIS
         # =========================
         st.subheader("🧠 Skills Analysis")
 
