@@ -6,7 +6,6 @@ from sklearn.metrics.pairwise import cosine_similarity
 import PyPDF2
 import plotly.express as px
 import plotly.graph_objects as go
-
 # =========================
 
 # LOAD MODEL FILES (SAFE)
