@@ -11,7 +11,7 @@ import plotly.graph_objects as go
 import plotly.express as px
 import time
 
-# sentence transformers
+# Sentence Transformers
 try:
     from sentence_transformers import SentenceTransformer
     ST_AVAILABLE = True
@@ -23,31 +23,48 @@ nltk.download('stopwords')
 # ======================
 # CONFIG
 # ======================
-st.set_page_config(page_title="CV Matcher Dashboard 🚀", layout="wide")
+st.set_page_config(page_title="CV Matcher Final Boss 🚀", layout="wide")
 
 # ======================
 # 🌐 LANGUAGE
 # ======================
 st.sidebar.title("⚙️ Settings / Paramètres")
-
 lang = st.sidebar.selectbox("🌐 Language / Langue", ["English", "Français"])
 
 def t(en, fr):
     return en if lang == "English" else fr
 
 # ======================
-# CSS
+# 🎨 CSS ULTRA PRO
 # ======================
 st.markdown("""
 <style>
+body {background-color:#0E1117;}
+
 .card {
     padding:20px;
     border-radius:15px;
     background: linear-gradient(135deg,#00c6ff,#0072ff);
     color:white;
     text-align:center;
-    font-size:20px;
+    box-shadow:0px 5px 15px rgba(0,0,0,0.3);
 }
+
+.metric-title {font-size:14px;opacity:0.8;}
+.big-number {font-size:30px;font-weight:bold;}
+
+.skill {
+    display:inline-block;
+    background:#1f4037;
+    padding:6px 12px;
+    margin:5px;
+    border-radius:20px;
+    color:white;
+}
+
+.match {background:#00FFAA;color:black;}
+.missing {background:#FF4B4B;color:white;}
+
 </style>
 """, unsafe_allow_html=True)
 
@@ -75,7 +92,7 @@ def clean_text(text):
     text = re.sub(r'[^a-zA-Z]', ' ', text).lower()
     words = list(set(text.split()))
     words = [w for w in words if w not in stop_words]
-    return " ".join(words)
+    return words
 
 # ======================
 # PDF
@@ -91,39 +108,50 @@ def read_pdf(file):
 # ======================
 # UI
 # ======================
-st.title(t("🚀 CV Matcher Dashboard", "🚀 Tableau de bord CV"))
+st.title("🚀 CV Matcher FINAL BOSS")
 
 col1, col2 = st.columns(2)
 
 with col1:
-    cv_file = st.file_uploader(t("Upload CV", "Importer CV"), type=["pdf"])
+    cv_file = st.file_uploader("📄 Upload CV", type=["pdf"])
 
 with col2:
-    job_desc = st.text_area(t("Job Description", "Description du poste"))
+    job_file = st.file_uploader("💼 Upload Job (PDF)", type=["pdf"])
+    job_desc = st.text_area("OR paste job description")
 
 cv_text = read_pdf(cv_file) if cv_file else ""
+job_text = read_pdf(job_file) if job_file else job_desc
 
 # ======================
 # ANALYZE
 # ======================
-if st.button(t("Analyze", "Analyser")):
+if st.button("🔥 Analyze Like a Boss"):
 
-    if cv_text == "" or job_desc == "":
-        st.warning(t("Fill inputs", "Remplir les champs"))
+    if cv_text == "" or job_text == "":
+        st.warning("Fill all inputs")
     else:
-        with st.spinner("..."):
+        with st.spinner("AI thinking..."):
             time.sleep(1)
 
-        cv_clean = clean_text(cv_text)
-        job_clean = clean_text(job_desc)
+        cv_words = clean_text(cv_text)
+        job_words = clean_text(job_text)
 
-        # Prediction
+        cv_clean = " ".join(cv_words)
+        job_clean = " ".join(job_words)
+
+        # ======================
+        # PREDICTION
+        # ======================
         cv_vec = vectorizer.transform([cv_clean])
-        pred = model.predict(cv_vec)[0]
+        pred_index = model.predict(cv_vec)[0]
+        pred = label_encoder.inverse_transform([pred_index])[0]
+
         probs = model.predict_proba(cv_vec)[0]
         confidence = max(probs)
 
-        # Matching
+        # ======================
+        # MATCHING
+        # ======================
         if ST_AVAILABLE:
             cv_emb = st_model.encode([cv_clean])
             job_emb = st_model.encode([job_clean])
@@ -133,77 +161,80 @@ if st.button(t("Analyze", "Analyser")):
             similarity = cosine_similarity(cv_vec, job_vec)[0][0]
 
         # ======================
-        # 🎯 KPI DASHBOARD
+        # DASHBOARD
         # ======================
         c1, c2, c3 = st.columns(3)
 
-        c1.markdown(f"<div class='card'>🎯 {pred}</div>", unsafe_allow_html=True)
-        c2.markdown(f"<div class='card'>📊 {confidence:.2f}</div>", unsafe_allow_html=True)
-        c3.markdown(f"<div class='card'>🔗 {similarity:.2f}</div>", unsafe_allow_html=True)
+        c1.markdown(f"<div class='card'><div class='metric-title'>🎯 Category</div><div class='big-number'>{pred}</div></div>", unsafe_allow_html=True)
+        c2.markdown(f"<div class='card'><div class='metric-title'>📊 Confidence</div><div class='big-number'>{confidence:.2f}</div></div>", unsafe_allow_html=True)
+        c3.markdown(f"<div class='card'><div class='metric-title'>🔗 Matching</div><div class='big-number'>{similarity:.2f}</div></div>", unsafe_allow_html=True)
 
         # ======================
-        # 🎯 GAUGE CHART
+        # GAUGE
         # ======================
         st.subheader("🎯 Matching Score")
 
-        fig_gauge = go.Figure(go.Indicator(
+        fig = go.Figure(go.Indicator(
             mode="gauge+number",
-            value=similarity * 100,
-            title={'text': "Match %"},
+            value=similarity*100,
             gauge={
-                'axis': {'range': [0, 100]},
-                'bar': {'color': "green"},
-                'steps': [
-                    {'range': [0, 40], 'color': "red"},
-                    {'range': [40, 70], 'color': "orange"},
-                    {'range': [70, 100], 'color': "green"}
+                'axis': {'range':[0,100]},
+                'steps':[
+                    {'range':[0,40],'color':'red'},
+                    {'range':[40,70],'color':'orange'},
+                    {'range':[70,100],'color':'green'}
                 ]
             }
         ))
 
-        st.plotly_chart(fig_gauge, use_container_width=True)
+        st.plotly_chart(fig, use_container_width=True)
 
         # ======================
-        # 📊 BAR CHART
+        # BAR
         # ======================
-        st.subheader("📊 Prediction Distribution")
-
         df = pd.DataFrame({
             "Category": label_encoder.classes_,
             "Probability": probs
         })
 
-        fig_bar = px.bar(df, x="Category", y="Probability",
-                         color="Probability",
-                         title="Model Confidence")
-
-        st.plotly_chart(fig_bar, use_container_width=True)
+        st.subheader("📊 Predictions")
+        st.bar_chart(df.set_index("Category"))
 
         # ======================
-        # 📈 TOP 5
+        # SKILLS MATCHING
         # ======================
-        st.subheader("🏆 Top Predictions")
+        st.subheader("🧠 Skills Analysis")
 
-        top5 = np.argsort(probs)[-5:][::-1]
-        for i in top5:
-            st.write(f"{label_encoder.inverse_transform([i])[0]} → {probs[i]:.2f}")
+        cv_set = set(cv_words)
+        job_set = set(job_words)
+
+        common = list(cv_set & job_set)[:15]
+        missing = list(job_set - cv_set)[:15]
+
+        st.write("✅ Matching Skills")
+        for s in common:
+            st.markdown(f"<span class='skill match'>{s}</span>", unsafe_allow_html=True)
+
+        st.write("❌ Missing Skills")
+        for s in missing:
+            st.markdown(f"<span class='skill missing'>{s}</span>", unsafe_allow_html=True)
 
         # ======================
-        # 📊 PIE CHART
+        # INTERPRETATION
         # ======================
-        st.subheader("📊 Category Share")
-
-        fig_pie = px.pie(df, names="Category", values="Probability")
-        st.plotly_chart(fig_pie, use_container_width=True)
-
-        # ======================
-        # 🧠 MATCH INTERPRETATION
-        # ======================
-        st.subheader("🧠 Interpretation")
+        st.subheader("🧠 AI Interpretation")
 
         if similarity > 0.75:
-            st.success("🔥 Strong Match")
+            st.success("🔥 Strong Match - Great CV!")
         elif similarity > 0.5:
-            st.info("🙂 Medium Match")
+            st.info("🙂 Medium Match - Improve skills")
         else:
-            st.error("❌ Weak Match")
+            st.error("❌ Weak Match - Needs improvement")
+
+        # ======================
+        # KEYWORDS
+        # ======================
+        st.subheader("💡 Keywords")
+
+        for w in cv_words[:20]:
+            st.markdown(f"<span class='skill'>{w}</span>", unsafe_allow_html=True)
