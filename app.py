@@ -7,6 +7,8 @@ from nltk.corpus import stopwords
 from PyPDF2 import PdfReader
 from sklearn.metrics.pairwise import cosine_similarity
 import plotly.graph_objects as go
+import plotly.express as px
+import pandas as pd
 import time
 from reportlab.platypus import SimpleDocTemplate, Paragraph
 from reportlab.lib.styles import getSampleStyleSheet
@@ -59,9 +61,9 @@ st.markdown("""
 # ======================
 # LOAD MODEL
 # ======================
-model = pickle.load(open("model.pkl", "rb"))
-vectorizer = pickle.load(open("vectorizer.pkl", "rb"))
-label_encoder = pickle.load(open("label_encoder.pkl", "rb"))
+model = pickle.load(open("model.pkl","rb"))
+vectorizer = pickle.load(open("vectorizer.pkl","rb"))
+label_encoder = pickle.load(open("label_encoder.pkl","rb"))
 
 # ======================
 # FUNCTIONS
@@ -132,32 +134,26 @@ if st.button("🔥 Analyze"):
         with st.spinner("Analyzing..."):
             time.sleep(1)
 
-        # CLEAN
         cv_words = clean_text(cv_text)
         job_words = clean_text(job_text)
 
         cv_clean = " ".join(cv_words)
         job_clean = " ".join(job_words)
 
-        # VECTORIZATION
         cv_vec = vectorizer.transform([cv_clean])
         job_vec = vectorizer.transform([job_clean])
 
-        # PREDICTION
         pred_idx = model.predict(cv_vec)[0]
         pred = label_encoder.inverse_transform([pred_idx])[0]
 
         probs = model.predict_proba(cv_vec)[0]
         confidence = float(np.max(probs))
 
-        # MATCHING
         similarity = float(cosine_similarity(cv_vec, job_vec)[0][0])
 
-        # SCORE
         score10 = round(similarity * 10, 1)
         percent = round(similarity * 100, 1)
 
-        # SKILLS
         cv_set = set(cv_words)
         job_set = set(job_words)
 
@@ -165,10 +161,11 @@ if st.button("🔥 Analyze"):
         missing = list(job_set - cv_set)[:15]
 
         # ======================
-        # DASHBOARD
+        # POWER BI STYLE DASHBOARD
         # ======================
-        c1, c2, c3 = st.columns(3)
+        st.subheader("📊 Dashboard")
 
+        c1, c2, c3 = st.columns(3)
         c1.markdown(f"<div class='card'>🎯 {pred}</div>", unsafe_allow_html=True)
         c2.markdown(f"<div class='card'>📊 {confidence:.2f}</div>", unsafe_allow_html=True)
         c3.markdown(f"<div class='card'>🔗 {percent}%</div>", unsafe_allow_html=True)
@@ -176,48 +173,50 @@ if st.button("🔥 Analyze"):
         # ======================
         # GAUGE
         # ======================
-        st.subheader("🎯 Matching Score")
-
         gauge = go.Figure(go.Indicator(
             mode="gauge+number",
             value=percent,
-            gauge={
-                'axis': {'range': [0, 100]},
-                'steps': [
-                    {'range': [0, 40], 'color': 'red'},
-                    {'range': [40, 70], 'color': 'orange'},
-                    {'range': [70, 100], 'color': 'green'}
-                ]
-            }
+            gauge={'axis': {'range': [0,100]}}
         ))
-
         st.plotly_chart(gauge, use_container_width=True)
+
+        # ======================
+        # BAR CHART (Power BI)
+        # ======================
+        df = pd.DataFrame({
+            "Type": ["Match Skills", "Missing Skills"],
+            "Count": [len(common), len(missing)]
+        })
+
+        fig_bar = px.bar(df, x="Type", y="Count", color="Type")
+        st.plotly_chart(fig_bar, use_container_width=True)
+
+        # ======================
+        # PIE CHART
+        # ======================
+        fig_pie = px.pie(df, names="Type", values="Count")
+        st.plotly_chart(fig_pie, use_container_width=True)
 
         # ======================
         # RADAR
         # ======================
-        st.subheader("🧠 Skills Radar")
-
         radar = go.Figure()
         radar.add_trace(go.Scatterpolar(
             r=[len(common), len(missing), score10],
             theta=["Match", "Missing", "Score"],
             fill='toself'
         ))
-
         st.plotly_chart(radar, use_container_width=True)
 
         # ======================
         # SKILLS
         # ======================
         st.subheader("✅ Matching Skills")
-
         cols = st.columns(5)
         for i, s in enumerate(common):
             cols[i % 5].markdown(f"<div class='skill match'>{s}</div>", unsafe_allow_html=True)
 
         st.subheader("❌ Missing Skills")
-
         cols = st.columns(5)
         for i, s in enumerate(missing):
             cols[i % 5].markdown(f"<div class='skill missing'>{s}</div>", unsafe_allow_html=True)
@@ -226,22 +225,22 @@ if st.button("🔥 Analyze"):
         # HIGHLIGHT
         # ======================
         st.subheader("📄 CV Highlight")
-
         st.markdown(highlight_text(cv_text, common[:10]), unsafe_allow_html=True)
 
         # ======================
         # AI EXPLANATION
         # ======================
         st.subheader("🤖 AI Explanation")
+        st.info(f"""
+Strong match: {', '.join(common[:5])}
 
-        st.info(
-            f"Strong match: {', '.join(common[:5])}\n\n"
-            f"Missing skills: {', '.join(missing[:5])}\n\n"
-            f"Recommendation: Learn {', '.join(missing[:3])}"
-        )
+Missing skills: {', '.join(missing[:5])}
+
+Recommendation: Learn {', '.join(missing[:3])}
+""")
 
         # ======================
-        # EXPORT PDF
+        # PDF
         # ======================
         generate_pdf(pred, score10, similarity, common, missing)
 
