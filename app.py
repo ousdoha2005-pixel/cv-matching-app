@@ -28,10 +28,9 @@ st.set_page_config(page_title="AI-Powered CV Matching & Recruitment Assistant", 
 lang = st.sidebar.selectbox("🌐 Language", ["English", "Français"])
 
 def t(en, fr):
-    st.sidebar.title(t("Settings", "Paramètres"))
     return en if lang == "English" else fr
 
-
+st.sidebar.title(t("Settings", "Paramètres"))
 
 # ======================
 # STYLE
