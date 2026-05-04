@@ -10,62 +10,64 @@ from sklearn.metrics.pairwise import cosine_similarity
 import time
 from collections import Counter
 
+# ⚠️ try import sentence-transformers
+try:
+    from sentence_transformers import SentenceTransformer
+    ST_AVAILABLE = True
+except:
+    ST_AVAILABLE = False
+
 nltk.download('stopwords')
 
 # ======================
 # CONFIG
 # ======================
-st.set_page_config(page_title="CV Matcher PRO MAX", page_icon="🚀", layout="wide")
+st.set_page_config(page_title="CV Matcher PRO", page_icon="🚀", layout="wide")
 
 # ======================
-# CSS ULTRA STYLE
+# LIGHT CSS (SAFE)
 # ======================
 st.markdown("""
 <style>
 body {background-color: #0E1117;}
-
-textarea {
-    background-color: #1E1E2F !important;
-    color:white !important;
-}
-
-/* CARDS */
+textarea {background-color:#1E1E2F !important; color:white !important;}
 .card {
-    padding:20px;
-    border-radius:15px;
-    background: linear-gradient(135deg,#00c6ff,#0072ff);
+    padding:15px;
+    border-radius:12px;
+    background: linear-gradient(90deg,#00c6ff,#0072ff);
     color:white;
     text-align:center;
     margin:10px;
-    font-size:20px;
-    box-shadow: 0px 4px 20px rgba(0,0,0,0.5);
 }
-
-/* BADGES */
 .badge {
-    background-color:#4CAF50;
-    padding:6px 12px;
+    background:#4CAF50;
+    padding:5px 10px;
     border-radius:10px;
-    margin:5px;
+    margin:4px;
     display:inline-block;
     color:white;
-    font-size:14px;
-}
-
-/* TITLE */
-h1 {
-    text-align:center;
-    color:#00c6ff;
+    font-size:13px;
 }
 </style>
 """, unsafe_allow_html=True)
 
 # ======================
-# LOAD MODEL
+# LOAD MODELS
 # ======================
 model = pickle.load(open("model.pkl","rb"))
 vectorizer = pickle.load(open("vectorizer.pkl","rb"))
 label_encoder = pickle.load(open("label_encoder.pkl","rb"))
+
+# ======================
+# LOAD SENTENCE MODEL (SAFE)
+# ======================
+@st.cache_resource
+def load_st_model():
+    if ST_AVAILABLE:
+        return SentenceTransformer('all-MiniLM-L6-v2')
+    return None
+
+st_model = load_st_model()
 
 # ======================
 # CLEAN
@@ -77,7 +79,7 @@ def clean_text(text):
     text = re.sub(r'[^a-zA-Z]', ' ', text)
     text = text.lower()
     words = text.split()
-    words = list(set(words))  # remove duplicates 🔥
+    words = list(set(words))
     words = [w for w in words if w not in stop_words]
     return " ".join(words)
 
@@ -95,7 +97,7 @@ def read_pdf(file):
 # ======================
 # KEYWORDS
 # ======================
-def extract_keywords(text, top_n=15):
+def extract_keywords(text, top_n=10):
     words = text.split()
     freq = Counter(words)
     return [w for w, _ in freq.most_common(top_n)]
@@ -103,7 +105,7 @@ def extract_keywords(text, top_n=15):
 # ======================
 # UI
 # ======================
-st.title("🚀 CV Matching Dashboard PRO MAX")
+st.title("🚀 CV Matcher (Stable Version)")
 
 col1, col2 = st.columns(2)
 
@@ -114,54 +116,63 @@ with col2:
     job_desc = st.text_area("💼 Job Description", height=150)
 
 cv_text = ""
-
 if cv_file:
     cv_text = read_pdf(cv_file)
 
 # ======================
 # BUTTON
 # ======================
-if st.button("🔍 Analyze CV"):
+if st.button("🔍 Analyze"):
 
     if cv_text == "" or job_desc.strip() == "":
-        st.warning("⚠️ Upload CV and job description")
+        st.warning("⚠️ Fill all inputs")
     else:
-        with st.spinner("⏳ AI is analyzing..."):
-            time.sleep(1.5)
+        with st.spinner("⏳ Processing..."):
+            time.sleep(1)
 
-        # CLEAN
         cv_clean = clean_text(cv_text)
         job_clean = clean_text(job_desc)
 
-        # VECTOR
+        # ======================
+        # CLASSIFICATION
+        # ======================
         cv_vec = vectorizer.transform([cv_clean])
-        job_vec = vectorizer.transform([job_clean])
-
-        # SIMILARITY
-        similarity = cosine_similarity(cv_vec, job_vec)[0][0]
-
-        # MODEL
         pred = model.predict(cv_vec)[0]
         probs = model.predict_proba(cv_vec)[0]
         confidence = max(probs)
 
         # ======================
-        # 🎯 DASHBOARD CARDS
+        # SAFE MATCHING (🔥)
+        # ======================
+        try:
+            if st_model:
+                cv_emb = st_model.encode([cv_clean], show_progress_bar=False)
+                job_emb = st_model.encode([job_clean], show_progress_bar=False)
+                similarity = cosine_similarity(cv_emb, job_emb)[0][0]
+            else:
+                raise Exception("ST not available")
+        except:
+            # fallback TF-IDF
+            job_vec = vectorizer.transform([job_clean])
+            similarity = cosine_similarity(cv_vec, job_vec)[0][0]
+
+        # ======================
+        # CARDS
         # ======================
         c1, c2, c3 = st.columns(3)
 
-        c1.markdown(f"<div class='card'>🎯 Category<br><b>{pred}</b></div>", unsafe_allow_html=True)
-        c2.markdown(f"<div class='card'>📊 Confidence<br><b>{confidence:.2f}</b></div>", unsafe_allow_html=True)
-        c3.markdown(f"<div class='card'>🔗 Match Score<br><b>{similarity:.2f}</b></div>", unsafe_allow_html=True)
+        c1.markdown(f"<div class='card'>🎯 {pred}</div>", unsafe_allow_html=True)
+        c2.markdown(f"<div class='card'>📊 {confidence:.2f}</div>", unsafe_allow_html=True)
+        c3.markdown(f"<div class='card'>🔗 {similarity:.2f}</div>", unsafe_allow_html=True)
 
         # ======================
-        # 📊 PROGRESS BAR
+        # PROGRESS
         # ======================
-        st.subheader("📈 Matching Level")
+        st.subheader("📈 Matching Score")
         st.progress(float(similarity))
 
         # ======================
-        # 🏆 TOP 3
+        # TOP 3
         # ======================
         st.subheader("🏆 Top Predictions")
 
@@ -169,13 +180,11 @@ if st.button("🔍 Analyze CV"):
 
         for i in top3:
             cat = label_encoder.inverse_transform([i])[0]
-            st.write(f"👉 {cat} : {probs[i]:.2f}")
+            st.write(f"{cat}: {probs[i]:.2f}")
 
         # ======================
-        # 📊 BAR CHART
+        # CHART
         # ======================
-        st.subheader("📊 Probability Distribution")
-
         df = pd.DataFrame({
             "Category": label_encoder.classes_,
             "Probability": probs
@@ -184,52 +193,27 @@ if st.button("🔍 Analyze CV"):
         st.bar_chart(df.set_index("Category"))
 
         # ======================
-        # 🥧 PIE CHART
+        # KEYWORDS
         # ======================
-        st.subheader("🥧 Category Share")
+        st.subheader("🧠 Keywords")
 
-        st.write(df.set_index("Category"))
-
-        # ======================
-        # 🧠 KEYWORDS
-        # ======================
-        st.subheader("🧠 Extracted Keywords")
-
-        keywords = extract_keywords(cv_clean)
-
-        for k in keywords:
+        for k in extract_keywords(cv_clean):
             st.markdown(f"<span class='badge'>{k}</span>", unsafe_allow_html=True)
 
         # ======================
-        # 🎯 SKILLS MATCHING
+        # INTERPRETATION
         # ======================
-        st.subheader("🎯 Matching Skills")
-
-        cv_words = set(cv_clean.split())
-        job_words = set(job_clean.split())
-
-        matched = cv_words.intersection(job_words)
-
-        if matched:
-            for m in list(matched)[:25]:
-                st.markdown(f"<span class='badge'>{m}</span>", unsafe_allow_html=True)
-        else:
-            st.write("No strong matching keywords")
-
-        # ======================
-        # 📌 INTERPRETATION
-        # ======================
-        st.subheader("📌 Final Decision")
+        st.subheader("📌 Result")
 
         if similarity > 0.7:
-            st.success("🔥 Excellent Match - Highly Recommended")
+            st.success("🔥 Excellent Match")
         elif similarity > 0.4:
-            st.info("🙂 Moderate Match")
+            st.info("🙂 Medium Match")
         else:
             st.error("❌ Weak Match")
 
         # ======================
         # CLEAN TEXT
         # ======================
-        with st.expander("🧹 Show Cleaned CV"):
+        with st.expander("🧹 Cleaned CV"):
             st.write(cv_clean)
