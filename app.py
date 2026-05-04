@@ -42,7 +42,7 @@ st.markdown("""
     background: linear-gradient(135deg,#00c6ff,#0072ff);
     color:white;
     text-align:center;
-    font-size:20px;
+    font-size:18px;
     font-weight:bold;
 }
 .skill {
@@ -104,6 +104,12 @@ def generate_pdf(pred, score, similarity, common, missing):
 
     doc.build(content)
 
+def animate_value(label, value):
+    placeholder = st.empty()
+    for i in np.linspace(0, value, 30):
+        placeholder.markdown(f"<div class='card'>{label}<br>{round(i,2)}</div>", unsafe_allow_html=True)
+        time.sleep(0.01)
+
 # ======================
 # UI
 # ======================
@@ -161,14 +167,35 @@ if st.button("🔥 Analyze"):
         missing = list(job_set - cv_set)[:15]
 
         # ======================
-        # POWER BI STYLE DASHBOARD
+        # DASHBOARD
         # ======================
-        st.subheader("📊 Dashboard")
+        st.subheader("📊 AI Dashboard")
 
-        c1, c2, c3 = st.columns(3)
-        c1.markdown(f"<div class='card'>🎯 {pred}</div>", unsafe_allow_html=True)
-        c2.markdown(f"<div class='card'>📊 {confidence:.2f}</div>", unsafe_allow_html=True)
-        c3.markdown(f"<div class='card'>🔗 {percent}%</div>", unsafe_allow_html=True)
+        st.markdown("""
+        This dashboard shows the performance of the CV against the job:
+        - Category prediction
+        - Confidence
+        - Matching score
+        """)
+
+        c1, c2, c3, c4 = st.columns(4)
+
+        with c1:
+            st.markdown(f"<div class='card'>🎯<br>{pred}</div>", unsafe_allow_html=True)
+
+        with c2:
+            animate_value("📊 Confidence", confidence)
+
+        with c3:
+            animate_value("🔗 Match %", percent)
+
+        with c4:
+            animate_value("⭐ Score /10", score10)
+
+        # ======================
+        # PROGRESS
+        # ======================
+        st.progress(int(percent))
 
         # ======================
         # GAUGE
@@ -181,21 +208,15 @@ if st.button("🔥 Analyze"):
         st.plotly_chart(gauge, use_container_width=True)
 
         # ======================
-        # BAR CHART (Power BI)
+        # BAR
         # ======================
         df = pd.DataFrame({
-            "Type": ["Match Skills", "Missing Skills"],
+            "Type": ["Matching Skills", "Missing Skills"],
             "Count": [len(common), len(missing)]
         })
 
-        fig_bar = px.bar(df, x="Type", y="Count", color="Type")
+        fig_bar = px.bar(df, x="Type", y="Count", color="Type", text="Count")
         st.plotly_chart(fig_bar, use_container_width=True)
-
-        # ======================
-        # PIE CHART
-        # ======================
-        fig_pie = px.pie(df, names="Type", values="Count")
-        st.plotly_chart(fig_pie, use_container_width=True)
 
         # ======================
         # RADAR
@@ -224,7 +245,7 @@ if st.button("🔥 Analyze"):
         # ======================
         # HIGHLIGHT
         # ======================
-        st.subheader("📄 CV Highlight")
+        st.subheader("📄 Highlight CV")
         st.markdown(highlight_text(cv_text, common[:10]), unsafe_allow_html=True)
 
         # ======================
@@ -240,7 +261,7 @@ Recommendation: Learn {', '.join(missing[:3])}
 """)
 
         # ======================
-        # PDF
+        # PDF EXPORT
         # ======================
         generate_pdf(pred, score10, similarity, common, missing)
 
