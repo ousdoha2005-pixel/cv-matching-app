@@ -210,6 +210,7 @@ if st.button("🔥 Analyze"):
         # ======================
         # BAR
         # ======================
+        st.subheader("📊 Skills Gap & Matching Analysis Dashboard")
         df = pd.DataFrame({
             "Type": ["Matching Skills", "Missing Skills"],
             "Count": [len(common), len(missing)]
