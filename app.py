@@ -32,7 +32,7 @@ st.set_page_config(page_title="CV Matcher AI PRO", layout="wide")
 lang = st.sidebar.selectbox("🌐 Language", ["English", "Français"])
 
 def t(en, fr):
-return en if lang == "English" else fr
+    return en if lang == "English" else fr
 
 st.sidebar.title(t("Settings", "Paramètres"))
 
