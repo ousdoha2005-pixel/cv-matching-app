@@ -19,17 +19,18 @@ from reportlab.lib.styles import getSampleStyleSheet
 nltk.download('stopwords')
 stop_words = set(stopwords.words('english'))
 
-st.set_page_config(page_title="CV Matcher AI PRO", layout="wide")
+st.set_page_config(page_title="AI-Powered CV Matching & Recruitment Assistant", layout="wide")
 
 # ======================
 # LANGUAGE
 # ======================
+st.sidebar.title(t("Settings", "Paramètres"))
 lang = st.sidebar.selectbox("🌐 Language", ["English", "Français"])
 
 def t(en, fr):
     return en if lang == "English" else fr
 
-st.sidebar.title(t("Settings", "Paramètres"))
+
 
 # ======================
 # STYLE
@@ -222,6 +223,7 @@ if st.button("🔥 Analyze"):
         # ======================
         # RADAR
         # ======================
+        st.subheader("📊 AI-Powered Skills Evaluation Radar")
         radar = go.Figure()
         radar.add_trace(go.Scatterpolar(
             r=[len(common), len(missing), score10],
