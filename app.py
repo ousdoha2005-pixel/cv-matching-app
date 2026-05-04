@@ -32,13 +32,13 @@ st.set_page_config(page_title="CV Matcher AI PRO", layout="wide")
 lang = st.sidebar.selectbox("🌐 Language", ["English", "Français"])
 
 def t(en, fr):
-    return en if lang == "English" else fr
+return en if lang == "English" else fr
 
 st.sidebar.title(t("Settings", "Paramètres"))
 
 # ======================
 
-# CSS PRO UI
+# CSS
 
 # ======================
 
@@ -55,7 +55,6 @@ body {background-color:#0E1117;}
     text-align:center;
     font-size:22px;
     font-weight:bold;
-    box-shadow:0 0 20px rgba(0,0,0,0.4);
 }
 
 .skill {
@@ -74,7 +73,6 @@ body {background-color:#0E1117;}
     color:black;
     padding:2px;
 }
-
 </style>
 
 """, unsafe_allow_html=True)
@@ -98,14 +96,16 @@ label_encoder = pickle.load(open("label_encoder.pkl","rb"))
 stop_words = set(stopwords.words('english'))
 
 def clean_text(text):
-text = re.sub(r'[^a-zA-Z]', ' ', text).lower()
-words = list(set(text.split()))
+text = re.sub(r'[^a-zA-Z]', ' ', text)
+text = text.lower()
+words = text.split()
+words = list(set(words))
 words = [w for w in words if w not in stop_words]
 return words
 
 # ======================
 
-# PDF READER
+# PDF
 
 # ======================
 
@@ -125,7 +125,7 @@ return text
 
 def highlight_text(text, keywords):
 for w in keywords:
-text = re.sub(f"\b{w}\b", f"<span class='highlight'>{w}</span>", text, flags=re.IGNORECASE)
+text = re.sub(rf"\b{w}\b", f"<span class='highlight'>{w}</span>", text, flags=re.IGNORECASE)
 return text
 
 # ======================
@@ -162,6 +162,7 @@ if st.button(t("Analyze", "Analyser")):
 ```
 if cv_text == "" or job_text == "":
     st.warning(t("Please fill all inputs", "Veuillez remplir tous les champs"))
+
 else:
     with st.spinner("AI analyzing..."):
         time.sleep(1)
@@ -195,27 +196,21 @@ else:
     common = list(cv_set & job_set)[:20]
     missing = list(job_set - cv_set)[:20]
 
-    # ======================
-    # DASHBOARD CARDS
-    # ======================
+    # CARDS
     c1, c2, c3 = st.columns(3)
 
     c1.markdown(f"<div class='card'>🎯 {pred}</div>", unsafe_allow_html=True)
     c2.markdown(f"<div class='card'>📊 {confidence:.2f}</div>", unsafe_allow_html=True)
     c3.markdown(f"<div class='card'>🔗 {percent}%</div>", unsafe_allow_html=True)
 
-    # ======================
-    # GAUGE (POWER BI STYLE)
-    # ======================
+    # GAUGE
     st.subheader("📊 Matching Score")
 
     fig = go.Figure(go.Indicator(
         mode="gauge+number",
         value=percent,
-        title={'text': "Match %"},
         gauge={
             'axis': {'range':[0,100]},
-            'bar': {'color':"cyan"},
             'steps':[
                 {'range':[0,40],'color':'red'},
                 {'range':[40,70],'color':'orange'},
@@ -226,9 +221,7 @@ else:
 
     st.plotly_chart(fig, use_container_width=True)
 
-    # ======================
     # RADAR
-    # ======================
     st.subheader("🧠 Skills Radar")
 
     radar = go.Figure()
@@ -240,9 +233,7 @@ else:
 
     st.plotly_chart(radar)
 
-    # ======================
-    # SKILLS GRID
-    # ======================
+    # SKILLS
     st.subheader("✅ Matching Skills")
 
     cols = st.columns(5)
@@ -255,17 +246,13 @@ else:
     for i, s in enumerate(missing):
         cols[i % 5].markdown(f"<div class='skill missing'>{s}</div>", unsafe_allow_html=True)
 
-    # ======================
     # HIGHLIGHT
-    # ======================
     st.subheader("📄 Highlight CV")
 
     highlighted = highlight_text(cv_text, common[:10])
     st.markdown(highlighted, unsafe_allow_html=True)
 
-    # ======================
-    # WHY MATCH AI
-    # ======================
+    # AI EXPLANATION
     st.subheader("🤖 AI Explanation")
 
     st.info(f"""
@@ -280,9 +267,7 @@ Improve skills in {', '.join(missing[:3])}
 """)
 
 ```
-    # ======================
-    # EXPORT PDF
-    # ======================
+    # PDF EXPORT
     def generate_pdf():
         doc = SimpleDocTemplate("report.pdf")
         styles = getSampleStyleSheet()
