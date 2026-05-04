@@ -6,3 +6,4 @@ nltk
 PyPDF2
 sentence-transformers
 matplotlib
+plotly
