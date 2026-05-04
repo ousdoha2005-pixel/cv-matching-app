@@ -7,7 +7,8 @@ import nltk
 from nltk.corpus import stopwords
 from PyPDF2 import PdfReader
 from sklearn.metrics.pairwise import cosine_similarity
-import matplotlib.pyplot as plt
+import plotly.graph_objects as go
+import plotly.express as px
 import time
 
 # sentence transformers
@@ -22,22 +23,23 @@ nltk.download('stopwords')
 # ======================
 # CONFIG
 # ======================
-st.set_page_config(page_title="CV Matcher GOD MODE 🚀", layout="wide")
+st.set_page_config(page_title="CV Matcher Dashboard 🚀", layout="wide")
 
 # ======================
 # 🌐 LANGUAGE
 # ======================
-lang = st.sidebar.selectbox("🌐 Language", ["English", "Français"])
+st.sidebar.title("⚙️ Settings / Paramètres")
+
+lang = st.sidebar.selectbox("🌐 Language / Langue", ["English", "Français"])
 
 def t(en, fr):
     return en if lang == "English" else fr
 
 # ======================
-# 🎨 CSS PRO MAX
+# CSS
 # ======================
 st.markdown("""
 <style>
-body {background:#0E1117;}
 .card {
     padding:20px;
     border-radius:15px;
@@ -45,27 +47,12 @@ body {background:#0E1117;}
     color:white;
     text-align:center;
     font-size:20px;
-    margin:10px;
-}
-.skill {
-    background:#1f4037;
-    padding:6px 12px;
-    border-radius:20px;
-    margin:4px;
-    display:inline-block;
-    color:#99f2c8;
-}
-.highlight {
-    background:#FFD700;
-    color:black;
-    padding:2px 4px;
-    border-radius:5px;
 }
 </style>
 """, unsafe_allow_html=True)
 
 # ======================
-# LOAD MODELS
+# LOAD
 # ======================
 model = pickle.load(open("model.pkl","rb"))
 vectorizer = pickle.load(open("vectorizer.pkl","rb"))
@@ -85,15 +72,13 @@ st_model = load_st()
 stop_words = set(stopwords.words('english'))
 
 def clean_text(text):
-    text = re.sub(r'<.*?>', '', text)
-    text = re.sub(r'[^a-zA-Z]', ' ', text)
-    text = text.lower()
+    text = re.sub(r'[^a-zA-Z]', ' ', text).lower()
     words = list(set(text.split()))
     words = [w for w in words if w not in stop_words]
     return " ".join(words)
 
 # ======================
-# PDF READER
+# PDF
 # ======================
 def read_pdf(file):
     pdf = PdfReader(file)
@@ -104,152 +89,121 @@ def read_pdf(file):
     return text
 
 # ======================
-# KEYWORDS
-# ======================
-def get_keywords(text):
-    return list(set([w for w in text.split() if len(w) > 3]))
-
-# ======================
-# HIGHLIGHT
-# ======================
-def highlight_text(text, keywords):
-    for word in keywords:
-        text = re.sub(f"\\b{word}\\b",
-                      f"<span class='highlight'>{word}</span>",
-                      text)
-    return text
-
-# ======================
-# RADAR
-# ======================
-def radar(common, missing):
-    labels = ["Match", "Missing"]
-    values = [len(common), len(missing)]
-    values += values[:1]
-
-    angles = np.linspace(0, 2*np.pi, len(labels), endpoint=False).tolist()
-    angles += angles[:1]
-
-    fig, ax = plt.subplots()
-    ax.plot(angles, values)
-    ax.fill(angles, values, alpha=0.3)
-    ax.set_xticks(angles[:-1])
-    ax.set_xticklabels(labels)
-    return fig
-
-# ======================
-# AI EXPLANATION
-# ======================
-def explain(sim, common, missing):
-    if sim > 0.75:
-        return "Strong match. Your CV aligns very well."
-    elif sim > 0.5:
-        return "Medium match. Improve some skills."
-    else:
-        return "Weak match. Many important skills missing."
-
-# ======================
 # UI
 # ======================
-st.title(t("🚀 CV Matcher GOD MODE", "🚀 Analyseur CV GOD MODE"))
+st.title(t("🚀 CV Matcher Dashboard", "🚀 Tableau de bord CV"))
 
 col1, col2 = st.columns(2)
 
 with col1:
-    cv_file = st.file_uploader("📄 Upload CV (PDF)", type=["pdf"])
+    cv_file = st.file_uploader(t("Upload CV", "Importer CV"), type=["pdf"])
 
 with col2:
-    job_file = st.file_uploader("💼 Upload Job (PDF)", type=["pdf"])
-    job_desc = st.text_area("OR paste job description")
+    job_desc = st.text_area(t("Job Description", "Description du poste"))
 
-cv_text = ""
-job_text = ""
-
-if cv_file:
-    cv_text = read_pdf(cv_file)
-
-if job_file:
-    job_text = read_pdf(job_file)
-elif job_desc:
-    job_text = job_desc
+cv_text = read_pdf(cv_file) if cv_file else ""
 
 # ======================
 # ANALYZE
 # ======================
-if st.button("🔍 Analyze"):
+if st.button(t("Analyze", "Analyser")):
 
-    if cv_text == "" or job_text == "":
-        st.warning("⚠️ Fill all inputs")
+    if cv_text == "" or job_desc == "":
+        st.warning(t("Fill inputs", "Remplir les champs"))
     else:
-        with st.spinner("⏳ AI Thinking..."):
+        with st.spinner("..."):
             time.sleep(1)
 
         cv_clean = clean_text(cv_text)
-        job_clean = clean_text(job_text)
+        job_clean = clean_text(job_desc)
 
-        # MODEL
+        # Prediction
         cv_vec = vectorizer.transform([cv_clean])
         pred = model.predict(cv_vec)[0]
         probs = model.predict_proba(cv_vec)[0]
         confidence = max(probs)
 
-        # MATCH
-        try:
-            if st_model:
-                cv_emb = st_model.encode([cv_clean])
-                job_emb = st_model.encode([job_clean])
-                similarity = cosine_similarity(cv_emb, job_emb)[0][0]
-            else:
-                raise Exception()
-        except:
+        # Matching
+        if ST_AVAILABLE:
+            cv_emb = st_model.encode([cv_clean])
+            job_emb = st_model.encode([job_clean])
+            similarity = cosine_similarity(cv_emb, job_emb)[0][0]
+        else:
             job_vec = vectorizer.transform([job_clean])
             similarity = cosine_similarity(cv_vec, job_vec)[0][0]
 
-        # KPIs
+        # ======================
+        # 🎯 KPI DASHBOARD
+        # ======================
         c1, c2, c3 = st.columns(3)
+
         c1.markdown(f"<div class='card'>🎯 {pred}</div>", unsafe_allow_html=True)
         c2.markdown(f"<div class='card'>📊 {confidence:.2f}</div>", unsafe_allow_html=True)
         c3.markdown(f"<div class='card'>🔗 {similarity:.2f}</div>", unsafe_allow_html=True)
 
-        # SKILLS
-        cv_k = get_keywords(cv_clean)
-        job_k = get_keywords(job_clean)
+        # ======================
+        # 🎯 GAUGE CHART
+        # ======================
+        st.subheader("🎯 Matching Score")
 
-        common = list(set(cv_k) & set(job_k))
-        missing = list(set(job_k) - set(cv_k))
+        fig_gauge = go.Figure(go.Indicator(
+            mode="gauge+number",
+            value=similarity * 100,
+            title={'text': "Match %"},
+            gauge={
+                'axis': {'range': [0, 100]},
+                'bar': {'color': "green"},
+                'steps': [
+                    {'range': [0, 40], 'color': "red"},
+                    {'range': [40, 70], 'color': "orange"},
+                    {'range': [70, 100], 'color': "green"}
+                ]
+            }
+        ))
 
-        # MATCH
-        st.subheader("🎯 Match")
-        st.progress(float(similarity))
+        st.plotly_chart(fig_gauge, use_container_width=True)
 
-        # EXPLANATION
-        st.subheader("🧠 AI Explanation")
-        st.info(explain(similarity, common, missing))
+        # ======================
+        # 📊 BAR CHART
+        # ======================
+        st.subheader("📊 Prediction Distribution")
 
-        # CHART
-        st.subheader("📊 Distribution")
-        df = pd.DataFrame({"Category": label_encoder.classes_, "Prob": probs})
-        st.bar_chart(df.set_index("Category"))
+        df = pd.DataFrame({
+            "Category": label_encoder.classes_,
+            "Probability": probs
+        })
 
-        # RADAR
-        st.subheader("📊 Skills Radar")
-        st.pyplot(radar(common, missing))
+        fig_bar = px.bar(df, x="Category", y="Probability",
+                         color="Probability",
+                         title="Model Confidence")
 
-        # COMMON
-        st.subheader("🔥 Common Skills")
-        for w in common[:15]:
-            st.markdown(f"<span class='skill'>{w}</span>", unsafe_allow_html=True)
+        st.plotly_chart(fig_bar, use_container_width=True)
 
-        # MISSING
-        st.subheader("🚨 Missing Skills")
-        for w in missing[:15]:
-            st.markdown(f"<span class='skill'>{w}</span>", unsafe_allow_html=True)
+        # ======================
+        # 📈 TOP 5
+        # ======================
+        st.subheader("🏆 Top Predictions")
 
-        # HIGHLIGHT CV
-        st.subheader("✨ Highlighted CV")
-        highlighted = highlight_text(cv_clean, common)
-        st.markdown(highlighted, unsafe_allow_html=True)
+        top5 = np.argsort(probs)[-5:][::-1]
+        for i in top5:
+            st.write(f"{label_encoder.inverse_transform([i])[0]} → {probs[i]:.2f}")
 
-        # CLEAN TEXT
-        with st.expander("🧹 Cleaned CV"):
-            st.write(cv_clean)
+        # ======================
+        # 📊 PIE CHART
+        # ======================
+        st.subheader("📊 Category Share")
+
+        fig_pie = px.pie(df, names="Category", values="Probability")
+        st.plotly_chart(fig_pie, use_container_width=True)
+
+        # ======================
+        # 🧠 MATCH INTERPRETATION
+        # ======================
+        st.subheader("🧠 Interpretation")
+
+        if similarity > 0.75:
+            st.success("🔥 Strong Match")
+        elif similarity > 0.5:
+            st.info("🙂 Medium Match")
+        else:
+            st.error("❌ Weak Match")
