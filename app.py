@@ -127,7 +127,7 @@ def animate_value(label, value):
 # ======================
 # UI
 # ======================
-st.title("🚀 CV Matcher AI PRO")
+st.title("🚀 AI-Powered CV Matching & Recruitment Assistant")
 
 col1, col2 = st.columns(2)
 
@@ -186,7 +186,7 @@ if st.button("🔥 Analyze"):
         # ======================
         # DASHBOARD
         # ======================
-        st.subheader("📊 AI Dashboard")
+        st.subheader("📊 AI Performance Dashboard")
 
         c1, c2, c3 = st.columns(3)
 
@@ -214,6 +214,7 @@ if st.button("🔥 Analyze"):
         # ======================
         # BAR
         # ======================
+        st.subheader("📈 Skills Match Analysis")
         df = pd.DataFrame({
             "Type": ["Matching", "Missing"],
             "Count": [len(common), len(missing)]
@@ -223,6 +224,7 @@ if st.button("🔥 Analyze"):
         # ======================
         # RADAR
         # ======================
+        st.subheader("🧠 AI-Powered Skills Evaluation Radar")
         radar = go.Figure()
         radar.add_trace(go.Scatterpolar(
             r=[len(common), len(missing), score10],
@@ -251,7 +253,7 @@ if st.button("🔥 Analyze"):
         # ======================
         # AI EXPLANATION
         # ======================
-        st.subheader("🤖 AI Explanation")
+        st.subheader("🤖 AI Matching Performance")
 
         if percent > 70:
             st.success("🔥 Strong match")
@@ -263,6 +265,8 @@ if st.button("🔥 Analyze"):
         # ======================
         # PDF
         # ======================
+        st.subheader("📄 Candidate–Job Matching Report")
+
         generate_pdf(pred, score10, percent, common, missing)
 
         with open("report.pdf", "rb") as f:
