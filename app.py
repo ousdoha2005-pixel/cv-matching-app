@@ -32,18 +32,23 @@ def t(en, fr):
 st.sidebar.title(t("Settings", "Paramètres"))
 
 # ======================
-# STYLE
+# STYLE (UPDATED 🔥)
 # ======================
 st.markdown("""
 <style>
 .card {
-    padding:20px;
+    padding:25px;
     border-radius:15px;
     background: linear-gradient(135deg,#00c6ff,#0072ff);
     color:white;
     text-align:center;
     font-size:18px;
     font-weight:bold;
+    height:150px;
+    display:flex;
+    flex-direction:column;
+    justify-content:center;
+    align-items:center;
 }
 .skill {
     display:inline-block;
@@ -67,7 +72,7 @@ vectorizer = pickle.load(open("vectorizer.pkl","rb"))
 label_encoder = pickle.load(open("label_encoder.pkl","rb"))
 
 # ======================
-# ICON FUNCTION (NEW 🔥)
+# ICON FUNCTION
 # ======================
 def get_icon(category):
     c = category.lower()
@@ -93,6 +98,46 @@ def get_icon(category):
         return "🎨"
     else:
         return "📌"
+
+# ======================
+# AI EXPLANATION (NEW 🔥)
+# ======================
+def ai_explanation(pred, percent, common, missing):
+    if percent > 75:
+        level_en = "strong alignment"
+        level_fr = "fort alignement"
+    elif percent > 40:
+        level_en = "moderate alignment"
+        level_fr = "alignement modéré"
+    else:
+        level_en = "weak alignment"
+        level_fr = "faible alignement"
+
+    en = f"""
+The candidate profile shows a **{level_en}** with the job category **{pred}**.
+
+The model detected **{len(common)} relevant skills** such as: {", ".join(common[:5])}.
+
+However, **{len(missing)} important skills are missing**, including: {", ".join(missing[:5])}.
+
+To improve compatibility, the candidate should focus on acquiring these missing skills.
+
+Overall matching score: **{percent}%**
+"""
+
+    fr = f"""
+Le profil du candidat présente un **{level_fr}** avec la catégorie **{pred}**.
+
+Le modèle a détecté **{len(common)} compétences pertinentes** comme: {", ".join(common[:5])}.
+
+Cependant, **{len(missing)} compétences importantes sont manquantes**, notamment: {", ".join(missing[:5])}.
+
+Pour améliorer la compatibilité, il est recommandé de développer ces compétences.
+
+Score global: **{percent}%**
+"""
+
+    return en if lang == "English" else fr
 
 # ======================
 # SKILLS DB
@@ -224,8 +269,8 @@ if st.button("🔥 Analyze"):
             st.markdown(f"""
             <div class='card'>
             {icon}<br>
-            Predicted Category<br>
-            {pred}
+            <small>Predicted Category</small><br>
+            <b>{pred}</b>
             </div>
             """, unsafe_allow_html=True)
 
@@ -299,14 +344,9 @@ if st.button("🔥 Analyze"):
         # ======================
         # AI RESULT
         # ======================
-        st.subheader("🤖 AI Result")
+        st.subheader("🤖 AI Explanation")
 
-        if percent > 70:
-            st.success("🔥 Strong Match")
-        elif percent > 40:
-            st.info("🙂 Medium Match")
-        else:
-            st.error("❌ Weak Match")
+        st.markdown(ai_explanation(pred, percent, common, missing))
 
         # ======================
         # PDF
