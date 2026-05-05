@@ -22,7 +22,7 @@ stop_words = set(stopwords.words('english'))
 st.set_page_config(page_title="AI-Powered CV Matching & Recruitment Assistant", layout="wide")
 
 # ======================
-# LANGUAGE
+# LANGUAGEl
 # ======================
 
 lang = st.sidebar.selectbox("🌐 Language", ["English", "Français"])
