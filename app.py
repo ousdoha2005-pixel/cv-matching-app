@@ -67,7 +67,35 @@ vectorizer = pickle.load(open("vectorizer.pkl","rb"))
 label_encoder = pickle.load(open("label_encoder.pkl","rb"))
 
 # ======================
-# SKILLS DATABASE (SMART)
+# ICON FUNCTION (NEW 🔥)
+# ======================
+def get_icon(category):
+    c = category.lower()
+    if "engineer" in c:
+        return "🛠️"
+    elif "data" in c:
+        return "📊"
+    elif "finance" in c:
+        return "💰"
+    elif "health" in c:
+        return "🏥"
+    elif "teacher" in c or "education" in c:
+        return "🎓"
+    elif "sales" in c:
+        return "📈"
+    elif "hr" in c:
+        return "👥"
+    elif "it" in c or "software" in c:
+        return "💻"
+    elif "marketing" in c:
+        return "📣"
+    elif "design" in c:
+        return "🎨"
+    else:
+        return "📌"
+
+# ======================
+# SKILLS DB
 # ======================
 SKILLS_DB = [
     "python","java","c++","sql","machine learning","deep learning",
@@ -121,7 +149,10 @@ def generate_pdf(pred, score, percent, common, missing):
 def animate_value(label, value):
     placeholder = st.empty()
     for i in np.linspace(0, value, 30):
-        placeholder.markdown(f"<div class='card'>{label}<br>{round(i,2)}</div>", unsafe_allow_html=True)
+        placeholder.markdown(
+            f"<div class='card'>{label}<br>{round(i,2)}</div>",
+            unsafe_allow_html=True
+        )
         time.sleep(0.01)
 
 # ======================
@@ -132,12 +163,12 @@ st.title("🚀 AI-Powered CV Matching & Recruitment Assistant")
 col1, col2 = st.columns(2)
 
 with col1:
-    cv_file = st.file_uploader(t("Upload CV (PDF)", "Uploader CV"), type=["pdf"])
-    cv_text_input = st.text_area(t("Paste your CV", "Coller CV"))
+    cv_file = st.file_uploader("Upload CV (PDF)", type=["pdf"])
+    cv_text_input = st.text_area("Paste your CV")
 
 with col2:
-    job_file = st.file_uploader(t("Upload Job (PDF)", "Uploader Offre"), type=["pdf"])
-    job_text_input = st.text_area(t("Paste Job Description", "Coller Offre"))
+    job_file = st.file_uploader("Upload Job (PDF)", type=["pdf"])
+    job_text_input = st.text_area("Paste Job Description")
 
 cv_text = read_pdf(cv_file) if cv_file else cv_text_input
 job_text = read_pdf(job_file) if job_file else job_text_input
@@ -154,14 +185,12 @@ if st.button("🔥 Analyze"):
         with st.spinner("Analyzing..."):
             time.sleep(1)
 
-        # CLEAN
         cv_words = clean_text(cv_text)
         job_words = clean_text(job_text)
 
         cv_clean = " ".join(cv_words)
         job_clean = " ".join(job_words)
 
-        # MODEL
         cv_vec = vectorizer.transform([cv_clean])
         job_vec = vectorizer.transform([job_clean])
 
@@ -176,7 +205,6 @@ if st.button("🔥 Analyze"):
         score10 = round(similarity * 10, 1)
         percent = round(similarity * 100, 1)
 
-        # SKILLS (SMART)
         cv_skills = extract_skills(cv_text)
         job_skills = extract_skills(job_text)
 
@@ -188,10 +216,18 @@ if st.button("🔥 Analyze"):
         # ======================
         st.subheader("📊 AI Performance Dashboard")
 
+        icon = get_icon(pred)
+
         c1, c2, c3 = st.columns(3)
 
         with c1:
-            st.markdown(f"<div class='card'>🎯<br>{pred}</div>", unsafe_allow_html=True)
+            st.markdown(f"""
+            <div class='card'>
+            {icon}<br>
+            Predicted Category<br>
+            {pred}
+            </div>
+            """, unsafe_allow_html=True)
 
         with c2:
             animate_value("📊 Confidence", confidence)
@@ -204,44 +240,52 @@ if st.button("🔥 Analyze"):
         # ======================
         # GAUGE
         # ======================
-        st.subheader("🎯 AI-Powered Matching Score (%)")
+        st.subheader("🎯 AI Matching Score (%)")
+
         gauge = go.Figure(go.Indicator(
             mode="gauge+number",
             value=percent,
             gauge={'axis': {'range': [0,100]}}
         ))
+
         st.plotly_chart(gauge, use_container_width=True)
 
         # ======================
         # BAR
         # ======================
         st.subheader("📈 Skills Match Analysis")
+
         df = pd.DataFrame({
             "Type": ["Matching", "Missing"],
             "Count": [len(common), len(missing)]
         })
-        st.plotly_chart(px.bar(df, x="Type", y="Count", color="Type", text="Count"))
+
+        st.plotly_chart(px.bar(df, x="Type", y="Count", text="Count"))
 
         # ======================
         # RADAR
         # ======================
-        st.subheader("🧠 AI-Powered Skills Evaluation Radar")
+        st.subheader("🧠 Skills Radar")
+
         radar = go.Figure()
         radar.add_trace(go.Scatterpolar(
             r=[len(common), len(missing), score10],
             theta=["Match", "Missing", "Score"],
             fill='toself'
         ))
+
         st.plotly_chart(radar)
 
         # ======================
-        # SKILLS UI
+        # SKILLS
         # ======================
         st.subheader("✅ Matching Skills")
+
         for s in common:
             st.markdown(f"<span class='skill match'>{s}</span>", unsafe_allow_html=True)
 
         st.subheader("❌ Missing Skills")
+
         for s in missing:
             st.markdown(f"<span class='skill missing'>{s}</span>", unsafe_allow_html=True)
 
@@ -249,24 +293,25 @@ if st.button("🔥 Analyze"):
         # HIGHLIGHT
         # ======================
         st.subheader("📄 Highlight CV")
+
         st.markdown(highlight_text(cv_text, common), unsafe_allow_html=True)
 
         # ======================
-        # AI EXPLANATION
+        # AI RESULT
         # ======================
-        st.subheader("🤖 AI Matching Performance")
+        st.subheader("🤖 AI Result")
 
         if percent > 70:
-            st.success("🔥 Strong match")
+            st.success("🔥 Strong Match")
         elif percent > 40:
-            st.info("🙂 Medium match")
+            st.info("🙂 Medium Match")
         else:
-            st.error("❌ Weak match")
+            st.error("❌ Weak Match")
 
         # ======================
         # PDF
         # ======================
-        st.subheader("📄 Candidate–Job Matching Report")
+        st.subheader("📄 Report")
 
         generate_pdf(pred, score10, percent, common, missing)
 
