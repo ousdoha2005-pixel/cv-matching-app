@@ -204,6 +204,7 @@ if st.button("🔥 Analyze"):
         # ======================
         # GAUGE
         # ======================
+        st.subheader("🎯 AI-Powered Matching Score (%)")
         gauge = go.Figure(go.Indicator(
             mode="gauge+number",
             value=percent,
