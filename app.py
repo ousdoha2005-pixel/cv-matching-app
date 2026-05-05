@@ -114,7 +114,7 @@ def animate_value(label, value):
 # ======================
 # UI
 # ======================
-st.title("🚀 CV Matcher AI PRO")
+st.title("🚀 AI-Powered CV Matching & Recruitment Assistant")
 
 col1, col2 = st.columns(2)
 
@@ -170,7 +170,7 @@ if st.button("🔥 Analyze"):
         # ======================
         # DASHBOARD
         # ======================
-        st.subheader("📊 AI Dashboard")
+        st.subheader("📊 AI Performance Dashboard")
 
         st.markdown("""
         This dashboard shows the performance of the CV against the job:
